@@ -1,0 +1,34 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connexion à CookCLI",
+        "description": "Renseigne l'adresse du serveur CookCLI si l'auto-découverte n'a pas fonctionné.",
+        "data": {
+          "host": "Hôte",
+          "port": "Port"
+        }
+      },
+      "hassio_confirm": {
+        "title": "Serveur CookCLI détecté",
+        "description": "L'add-on CookCLI a été détecté sur {host}. Ajouter cette intégration ?"
+      }
+    },
+    "error": {
+      "cannot_connect": "Impossible de contacter le serveur CookCLI. Vérifie l'adresse, le port, et que l'add-on est démarré."
+    },
+    "abort": {
+      "already_configured": "Ce serveur CookCLI est déjà configuré."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "host": "Hôte",
+          "port": "Port"
+        }
+      }
+    }
+  }
+}
