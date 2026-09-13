@@ -43,14 +43,19 @@ async def ws_list_recipes(
         return
 
     coordinator = entry_data["coordinator"]
-    connection.send_result(
-        msg["id"],
-        {
-            "recipes": [
-                {"path": r.path, "name": r.name} for r in coordinator.data or []
-            ]
-        },
-    )
+    recipes = []
+    for r in coordinator.data or []:
+        metadata = ((r.raw or {}).get("recipe") or {}).get("metadata") or {}
+        recipes.append(
+            {
+                "path": r.path,
+                "name": r.name,
+                "time": metadata.get("time"),
+                "servings": metadata.get("servings"),
+                "tags": metadata.get("tags", []),
+            }
+        )
+    connection.send_result(msg["id"], {"recipes": recipes})
 
 
 @websocket_api.websocket_command(
