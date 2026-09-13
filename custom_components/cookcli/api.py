@@ -54,6 +54,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -98,7 +99,7 @@ class CookCliApiClient:
 
     async def async_list_recipes(self) -> list[RecipeSummary]:
         """Récupère la liste des recettes disponibles."""
-        data = await self._request("GET", "/recipes")
+        data = await self._request_json("/recipes")
         return self._normalize_recipe_list(data)
 
     async def async_get_recipe(self, path: str) -> dict[str, Any]:
@@ -109,29 +110,64 @@ class CookCliApiClient:
         remplacé ces index par les objets correspondants (voir
         `_resolve_recipe`).
         """
-        data = await self._request("GET", f"/recipes/{path}")
+        data = await self._request_json(f"/recipes/{path}")
         return _resolve_recipe(data)
 
-    async def _request(self, method: str, endpoint: str) -> Any:
+    async def async_get_image(self, image_ref: str) -> tuple[bytes, str | None]:
+        """Récupère les octets d'une image statique CookCLI.
+
+        `image_ref` peut prendre trois formes selon d'où il vient :
+        - "/api/static/img/x.jpg" : valeur brute du champ "image" du détail
+          d'une recette (chemin déjà préfixé par /api).
+        - "/img/x.jpg" ou "img/x.jpg" : valeur brute de metadata.image dans
+          l'arborescence de /api/recipes (chemin relatif, avec ou sans "/"
+          initial selon comment la recette a été écrite).
+
+        Ces trois formes ont été observées dans des réponses réelles du
+        serveur (pas juste supposées) ; `_image_endpoint` les normalise
+        toutes vers /static/... — à vérifier visuellement une fois la carte
+        rechargée, au cas où une recette aurait un format différent.
+        """
+        endpoint = self._image_endpoint(image_ref)
+        async with self._get(endpoint) as resp:
+            content_type = resp.headers.get("Content-Type")
+            data = await resp.read()
+            return data, content_type
+
+    @staticmethod
+    def _image_endpoint(image_ref: str) -> str:
+        if image_ref.startswith("/api/"):
+            return image_ref[len("/api") :]
+        if image_ref.startswith("/"):
+            return f"/static{image_ref}"
+        return f"/static/{image_ref}"
+
+    @asynccontextmanager
+    async def _get(self, endpoint: str):
+        """Contexte partagé pour un GET vers CookCLI, avec gestion d'erreurs."""
         url = f"{self._base_url}{endpoint}"
         try:
             async with self._session.request(
-                method, url, timeout=DEFAULT_TIMEOUT
+                "GET", url, timeout=DEFAULT_TIMEOUT
             ) as resp:
                 if resp.status >= 400:
                     raise CookCliResponseError(
                         f"CookCLI a répondu {resp.status} pour {url}"
                     )
-                try:
-                    return await resp.json()
-                except (aiohttp.ContentTypeError, ValueError) as err:
-                    raise CookCliResponseError(
-                        f"Réponse non-JSON de CookCLI pour {url}"
-                    ) from err
+                yield resp
         except asyncio.TimeoutError as err:
             raise CookCliConnectionError(f"Timeout en contactant {url}") from err
         except aiohttp.ClientError as err:
             raise CookCliConnectionError(f"Impossible de joindre {url}: {err}") from err
+
+    async def _request_json(self, endpoint: str) -> Any:
+        async with self._get(endpoint) as resp:
+            try:
+                return await resp.json()
+            except (aiohttp.ContentTypeError, ValueError) as err:
+                raise CookCliResponseError(
+                    f"Réponse non-JSON de CookCLI pour {endpoint}"
+                ) from err
 
     @staticmethod
     def _normalize_recipe_list(data: Any) -> list[RecipeSummary]:

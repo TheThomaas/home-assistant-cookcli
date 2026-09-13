@@ -162,10 +162,16 @@ class CookCliCard extends HTMLElement {
         const meta = [];
         if (r.time) meta.push(`<span>⏱ ${this._escape(r.time)}</span>`);
         if (r.servings) meta.push(`<span>🍽 ${this._escape(String(r.servings))}</span>`);
+        const thumb = r.image_url
+          ? `<img class="recipe-thumb" src="${this._escape(r.image_url)}" alt="" loading="lazy" onerror="this.style.display='none'">`
+          : `<div class="recipe-thumb recipe-thumb-placeholder"></div>`;
         return `
           <div class="recipe-row" data-path="${this._escape(r.path)}">
-            <div class="recipe-name">${this._escape(r.name)}</div>
-            <div class="recipe-meta">${meta.join("")}</div>
+            ${thumb}
+            <div class="recipe-row-text">
+              <div class="recipe-name">${this._escape(r.name)}</div>
+              <div class="recipe-meta">${meta.join("")}</div>
+            </div>
           </div>`;
       })
       .join("");
@@ -217,6 +223,11 @@ class CookCliCard extends HTMLElement {
 
     return `
       <button class="back-btn" data-action="back">← Retour à la liste</button>
+      ${
+        r.image_url
+          ? `<img class="recipe-hero" src="${this._escape(r.image_url)}" alt="" onerror="this.style.display='none'">`
+          : ""
+      }
       <h2>${this._escape(r.title || "")}</h2>
       ${cookware ? `<h4>Ustensiles</h4><ul class="cookware-list">${cookware}</ul>` : ""}
       <h4>Ingrédients</h4>
@@ -246,16 +257,29 @@ class CookCliCard extends HTMLElement {
       .state-msg.error { color: var(--error-color, #db4437); }
       .recipe-list { display: flex; flex-direction: column; }
       .recipe-row {
-        display: flex; justify-content: space-between; align-items: center;
-        padding: 12px 4px; border-bottom: 1px solid var(--divider-color);
+        display: flex; align-items: center; gap: 12px;
+        padding: 10px 4px; border-bottom: 1px solid var(--divider-color);
         cursor: pointer;
       }
       .recipe-row:last-child { border-bottom: none; }
       .recipe-row:hover { background: var(--secondary-background-color); }
-      .recipe-name { font-weight: 500; color: var(--primary-text-color); }
+      .recipe-thumb {
+        width: 56px; height: 56px; border-radius: 8px; object-fit: cover;
+        flex-shrink: 0; background: var(--secondary-background-color);
+      }
+      .recipe-thumb-placeholder { background: var(--divider-color); }
+      .recipe-row-text { min-width: 0; }
+      .recipe-name {
+        font-weight: 500; color: var(--primary-text-color);
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
       .recipe-meta {
         display: flex; gap: 12px; font-size: 0.85em;
         color: var(--secondary-text-color); white-space: nowrap;
+      }
+      .recipe-hero {
+        width: 100%; max-height: 220px; object-fit: cover;
+        border-radius: 8px; margin: 4px 0 8px; display: block;
       }
       .back-btn {
         background: none; border: none; color: var(--primary-color);

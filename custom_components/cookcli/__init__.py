@@ -12,6 +12,7 @@ from .api import CookCliApiClient, CookCliApiError
 from .const import CONF_HOST, CONF_PORT, DOMAIN, PLATFORMS
 from .coordinator import CookCliCoordinator
 from .websocket_api import async_setup_websocket_api
+from .image_proxy import CookCliImageView
 
 _LOGGER = logging.getLogger(__name__)
 
