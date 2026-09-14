@@ -65,8 +65,28 @@ class CookCliRecipeViewStrategy extends HTMLElement {
     if (config.timer_entity) {
       cards.push({
         type: "custom:simple-timer-card",
-        entities: [config.timer_entity],
-        show_active_header: false
+        style: "fill_horizontal",
+        show_active_header: false,
+        entities: [{
+          entity: config.timer_entity,
+          keep_timer_visible_when_idle: true,
+          name: " "
+        }]
+      });
+      cards.push({
+        type: "horizontal-stack",
+        cards: [
+          {
+            type: "markdown",
+            content: " ",
+            text_only: true
+          },
+          {
+            type: "custom:circular-timer-card",
+            entity: config.timer_entity,
+            primary_info: "none"
+          }
+        ]
       });
     }
 
@@ -75,6 +95,13 @@ class CookCliRecipeViewStrategy extends HTMLElement {
         type: "todo-list",
         entity: recipe.todo_entity_id,
         title: "Ingrédients à rassembler",
+        card_mod: {
+          style: `
+              ha-list .header {
+                display: none;
+              }
+            `
+        }
       });
     }
 
