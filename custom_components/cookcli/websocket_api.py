@@ -11,6 +11,11 @@ Les deux commandes ajoutent un champ "image_url" déjà prêt à l'emploi pour
 un <img src="...">, qui pointe vers CookCliImageView (voir image_proxy.py) —
 le frontend n'a pas besoin de connaître le format brut des chemins d'image
 renvoyés par CookCLI.
+
+cookcli/recipe repeuple aussi l'entité todo d'ingrédients (todo.py) avec les
+ingrédients de la recette ouverte, et renvoie son entity_id dans
+"todo_entity_id" pour que le frontend puisse l'afficher avec la carte
+native `todo-list`.
 """
 
 from __future__ import annotations
@@ -41,6 +46,21 @@ def _image_url(entry_id: str, image_ref: str | None) -> str | None:
     if not image_ref:
         return None
     return f"/api/cookcli/image/{entry_id}/{quote(image_ref, safe='/')}"
+
+
+def _ingredient_summaries(ingredients: list[dict]) -> list[str]:
+    """Formate chaque ingrédient en une ligne lisible pour la checklist."""
+    summaries = []
+    for ingredient in ingredients:
+        quantity = ingredient.get("quantity") or {}
+        value = quantity.get("value")
+        unit = quantity.get("unit")
+        prefix = " ".join(
+            str(part) for part in (value, unit) if part not in (None, "")
+        )
+        name = ingredient.get("name", "")
+        summaries.append(f"{prefix} {name}".strip() if prefix else name)
+    return summaries
 
 
 @websocket_api.websocket_command(
@@ -99,6 +119,12 @@ async def ws_get_recipe(
         return
 
     recipe["image_url"] = _image_url(entry_id, recipe.get("image"))
+
+    todo_entity = entry_data.get("todo_entity")
+    if todo_entity is not None:
+        todo_entity.set_ingredients(_ingredient_summaries(recipe.get("ingredients", [])))
+        recipe["todo_entity_id"] = todo_entity.entity_id
+
     connection.send_result(msg["id"], recipe)
 
 

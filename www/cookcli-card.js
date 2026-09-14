@@ -1,15 +1,12 @@
 /**
- * Carte Lovelace pour l'intégration CookCLI.
+ * Carte Lovelace pour l'intégration CookCLI — liste navigable des recettes.
  *
- * Consomme les commandes websocket exposées par l'intégration :
- * - cookcli/recipes -> liste (path, name, time, servings, tags)
- * - cookcli/recipe  -> détail (title, ingredients, cookware, sections)
+ * Le détail d'une recette n'est plus géré par cette carte : un clic sur une
+ * ligne navigue vers une vue générée par cookcli-recipe-strategy.js (voir ce
+ * fichier), qui affiche étapes/ingrédients/minuteur via des cartes natives
+ * et des cartes tierces (tabdeck-card, simple-timer-card).
  *
- * Limitation connue : les images de recettes ne sont pas affichées. Le
- * serveur CookCLI n'est joignable depuis le navigateur ni sur son port
- * ingress (restreint au Supervisor) ni sur son port direct (non exposé au
- * LAN) — il faudrait un endpoint de proxy côté intégration pour les servir.
- * Voir le README du projet pour plus de détails si tu veux l'ajouter.
+ * Consomme cookcli/recipes (path, name, time, servings, tags, image_url).
  *
  * Installation :
  * 1. Copie ce fichier dans config/www/cookcli-card.js
@@ -18,18 +15,17 @@
  * 3. Ajoute une carte manuelle sur un tableau de bord :
  *    type: custom:cookcli-card
  *    title: Mes recettes
+ *    detail_view_path: recette   # doit correspondre au "path" de la vue de détail
  */
 
 class CookCliCard extends HTMLElement {
   static getStubConfig() {
-    return { title: "Recettes" };
+    return { title: "Recettes", detail_view_path: "recette" };
   }
 
   setConfig(config) {
     this._config = config || {};
-    this._view = "list";
     this._recipes = null;
-    this._selected = null;
     this._loading = false;
     this._error = null;
 
@@ -51,22 +47,14 @@ class CookCliCard extends HTMLElement {
     return 6;
   }
 
-  _wsMessage(extra) {
-    const msg = { ...extra };
-    if (this._config.entry_id) {
-      msg.entry_id = this._config.entry_id;
-    }
-    return msg;
-  }
-
   async _fetchRecipes() {
     this._loading = true;
     this._error = null;
     this._render();
     try {
-      const result = await this._hass.connection.sendMessagePromise(
-        this._wsMessage({ type: "cookcli/recipes" })
-      );
+      const msg = { type: "cookcli/recipes" };
+      if (this._config.entry_id) msg.entry_id = this._config.entry_id;
+      const result = await this._hass.connection.sendMessagePromise(msg);
       this._recipes = result.recipes || [];
     } catch (err) {
       this._error = (err && err.message) || "Erreur inconnue";
@@ -76,36 +64,22 @@ class CookCliCard extends HTMLElement {
     }
   }
 
-  async _openRecipe(path) {
-    this._loading = true;
-    this._error = null;
-    this._render();
-    try {
-      const result = await this._hass.connection.sendMessagePromise(
-        this._wsMessage({ type: "cookcli/recipe", path })
-      );
-      this._selected = result;
-      this._view = "detail";
-    } catch (err) {
-      this._error = (err && err.message) || "Erreur inconnue";
-    } finally {
-      this._loading = false;
-      this._render();
-    }
+  _navigateToRecipe(path) {
+    const detailPath = this._config.detail_view_path || "recette";
+    // Racine du dashboard courant, ex: "/lovelace-cookcli" depuis
+    // "/lovelace-cookcli/recettes" — on y accroche la vue de détail.
+    const dashboardRoot = window.location.pathname.split("/").slice(0, 2).join("/");
+    const url = `${dashboardRoot}/${detailPath}?path=${encodeURIComponent(path)}`;
+
+    // Navigation interne HA, sans recharger la page (comme un tap_action navigate).
+    window.history.pushState(null, "", url);
+    window.dispatchEvent(new CustomEvent("location-changed", { detail: { replace: false } }));
   }
 
   _onClick(event) {
-    const backEl = event.target.closest("[data-action='back']");
-    if (backEl) {
-      this._view = "list";
-      this._selected = null;
-      this._error = null;
-      this._render();
-      return;
-    }
     const itemEl = event.target.closest("[data-path]");
     if (itemEl) {
-      this._openRecipe(itemEl.dataset.path);
+      this._navigateToRecipe(itemEl.dataset.path);
     }
   }
 
@@ -113,37 +87,6 @@ class CookCliCard extends HTMLElement {
     const div = document.createElement("div");
     div.textContent = str ?? "";
     return div.innerHTML;
-  }
-
-  _formatQuantity(quantity) {
-    if (!quantity) return "";
-    const value = quantity.value ?? "";
-    const unit = quantity.unit ?? "";
-    return `${value} ${unit}`.trim();
-  }
-
-  _renderStepItem(item) {
-    switch (item.type) {
-      case "text":
-        return this._escape(item.value);
-      case "ingredient": {
-        const qty = this._formatQuantity(item.quantity);
-        return `<span class="ingredient">${this._escape(item.name)}${
-          qty ? ` (${this._escape(qty)})` : ""
-        }</span>`;
-      }
-      case "cookware":
-        return `<span class="cookware">${this._escape(item.name)}</span>`;
-      case "timer": {
-        const duration = item.duration ?? "";
-        const unit = item.unit ?? "";
-        return `<span class="timer">⏱ ${this._escape(String(duration))}${
-          unit ? " " + this._escape(unit) : ""
-        }</span>`;
-      }
-      default:
-        return "";
-    }
   }
 
   _renderList() {
@@ -179,73 +122,13 @@ class CookCliCard extends HTMLElement {
     return `<div class="recipe-list">${rows}</div>`;
   }
 
-  _renderDetail() {
-    if (this._loading) {
-      return `<div class="state-msg">Chargement…</div>`;
-    }
-    if (this._error) {
-      return `
-        <button class="back-btn" data-action="back">← Retour à la liste</button>
-        <div class="state-msg error">${this._escape(this._error)}</div>`;
-    }
-    if (!this._selected) return "";
-
-    const r = this._selected;
-
-    const ingredients = (r.ingredients || [])
-      .map((i) => {
-        const qty = this._formatQuantity(i.quantity);
-        return `<li>${qty ? `<strong>${this._escape(qty)}</strong> ` : ""}${this._escape(
-          i.name
-        )}</li>`;
-      })
-      .join("");
-
-    const cookware = (r.cookware || [])
-      .map((c) => `<li>${this._escape(c.name)}</li>`)
-      .join("");
-
-    const sections = (r.sections || [])
-      .map((section) => {
-        const steps = (section.steps || [])
-          .map(
-            (step) =>
-              `<li>${(step.items || [])
-                .map((item) => this._renderStepItem(item))
-                .join("")}</li>`
-          )
-          .join("");
-        return `
-          ${section.name ? `<h4>${this._escape(section.name)}</h4>` : ""}
-          <ol class="steps">${steps}</ol>`;
-      })
-      .join("");
-
-    return `
-      <button class="back-btn" data-action="back">← Retour à la liste</button>
-      ${
-        r.image_url
-          ? `<img class="recipe-hero" src="${this._escape(r.image_url)}" alt="" onerror="this.style.display='none'">`
-          : ""
-      }
-      <h2>${this._escape(r.title || "")}</h2>
-      ${cookware ? `<h4>Ustensiles</h4><ul class="cookware-list">${cookware}</ul>` : ""}
-      <h4>Ingrédients</h4>
-      <ul class="ingredients">${ingredients}</ul>
-      <h4>Préparation</h4>
-      ${sections}
-    `;
-  }
-
   _render() {
     if (!this.shadowRoot) return;
     const title = this._config.title || "Recettes";
     this.shadowRoot.innerHTML = `
       <style>${this._styles()}</style>
-      <ha-card header="${this._view === "list" ? this._escape(title) : ""}">
-        <div class="card-content">
-          ${this._view === "list" ? this._renderList() : this._renderDetail()}
-        </div>
+      <ha-card header="${this._escape(title)}">
+        <div class="card-content">${this._renderList()}</div>
       </ha-card>
     `;
   }
@@ -277,22 +160,6 @@ class CookCliCard extends HTMLElement {
         display: flex; gap: 12px; font-size: 0.85em;
         color: var(--secondary-text-color); white-space: nowrap;
       }
-      .recipe-hero {
-        width: 100%; max-height: 220px; object-fit: cover;
-        border-radius: 8px; margin: 4px 0 8px; display: block;
-      }
-      .back-btn {
-        background: none; border: none; color: var(--primary-color);
-        font-size: 0.95em; cursor: pointer; padding: 12px 0 4px; display: block;
-      }
-      h2 { margin: 4px 0 8px; color: var(--primary-text-color); }
-      h4 { margin: 16px 0 4px; color: var(--primary-text-color); }
-      ul, ol { margin: 4px 0; padding-left: 20px; color: var(--primary-text-color); }
-      ul.ingredients li, ul.cookware-list li { margin: 2px 0; }
-      ol.steps li { margin: 8px 0; line-height: 1.5; }
-      .ingredient { color: var(--primary-color); font-weight: 500; }
-      .cookware { font-style: italic; color: var(--secondary-text-color); }
-      .timer { color: var(--warning-color, #ff9800); font-weight: 500; }
     `;
   }
 }
@@ -303,5 +170,5 @@ window.customCards = window.customCards || [];
 window.customCards.push({
   type: "cookcli-card",
   name: "CookCLI Recipes",
-  description: "Liste navigable de tes recettes CookCLI, avec ingrédients et étapes.",
+  description: "Liste navigable de tes recettes CookCLI.",
 });

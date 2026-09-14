@@ -11,8 +11,8 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .api import CookCliApiClient, CookCliApiError
 from .const import CONF_HOST, CONF_PORT, DOMAIN, PLATFORMS
 from .coordinator import CookCliCoordinator
-from .websocket_api import async_setup_websocket_api
 from .image_proxy import CookCliImageView
+from .websocket_api import async_setup_websocket_api
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -38,10 +38,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "coordinator": coordinator,
     }
 
-    # Les commandes websocket sont globales au domaine, on ne les enregistre
-    # qu'une seule fois même si plusieurs serveurs CookCLI sont configurés.
+    # Les commandes websocket et la vue de proxy d'images sont globales au
+    # domaine, on ne les enregistre qu'une seule fois même si plusieurs
+    # serveurs CookCLI sont configurés.
     if len(hass.data[DOMAIN]) == 1:
         async_setup_websocket_api(hass)
+        hass.http.register_view(CookCliImageView(hass))
 
     if PLATFORMS:
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
