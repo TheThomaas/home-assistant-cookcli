@@ -1,40 +1,92 @@
 /**
- * View strategy CookCLI : génère la vue de détail d'une recette.
+ * Strategies CookCLI pour Home Assistant : une dashboard strategy + une view
+ * strategy compagne.
  *
- * Contrairement à une carte custom classique, une view strategy ne gère pas
- * son propre état de navigation : elle génère la config d'UNE vue HA
- * (titre + liste de cartes) à partir de `config` (donné en YAML) et de
- * `hass`, au moment où la vue est ouverte. Voir :
- * https://developers.home-assistant.io/docs/frontend/custom-ui/custom-strategy/#views
- *
- * Le chemin de la recette à afficher (`path`) est lu soit dans `config`
- * (fixe, une vue par recette), soit — cas normal ici — dans le paramètre
- * d'URL `?path=...` que cookcli-card.js pose avant de naviguer. Une view
- * strategy tourne dans le navigateur, donc lire window.location est légitime
- * même si HA ne le passe pas explicitement dans `config`.
+ * IMPORTANT : la view strategy seule ne suffit pas pour une navigation
+ * fluide. Une view strategy régénère son contenu au MONTAGE de la vue, pas à
+ * chaque changement d'URL — avec une seule vue partagée "recette?path=..."
+ * pour toutes les recettes, passer de l'une à l'autre sans recharger la
+ * page laissait afficher l'ancienne recette (vue déjà montée, jamais
+ * remontée). D'où la dashboard strategy : elle génère une VUE DISTINCTE par
+ * recette (un vrai `path` HA différent pour chacune), ce qui force un
+ * remontage — donc une régénération — à chaque navigation.
  *
  * Cartes utilisées, toutes tierces ou natives — aucune carte custom pour le
  * rendu du contenu lui-même :
- * - markdown (native)      : titre, image, ustensiles, texte des étapes
- * - todo-list (native)     : checklist des ingrédients (todo.py côté backend)
- * - button (native)        : démarre le minuteur partagé avec la bonne durée
- * - custom:simple-timer-card : affichage/contrôle du minuteur partagé
- * - custom:tabdeck-card      : une tab par étape
+ * - markdown (native)         : titre, image, ustensiles, texte des étapes
+ * - todo-list (native)        : checklist des ingrédients (todo.py backend)
+ * - button (native)           : démarre le minuteur avec la bonne durée
+ * - custom:circular-timer-card : affichage/contrôle du minuteur partagé
+ * - custom:tabdeck-card         : une tab par étape
+ * - custom:cookcli-card         : la liste (voir cookcli-card.js)
  *
- * Configuration de la vue (YAML) :
- *   views:
- *     - path: recette
- *       strategy:
- *         type: custom:cookcli-recipe
- *         timer_entity: timer.cookcli   # créé manuellement, voir README
- *         entry_id: xxxx                # optionnel, si plusieurs serveurs CookCLI
+ * Configuration du tableau de bord (remplace le contenu YAML du dashboard) :
+ *   strategy:
+ *     type: custom:cookcli
+ *     title: Recettes
+ *     timer_entity: timer.recette_en_cours   # créé manuellement, voir README
+ *     entry_id: xxxx                          # optionnel, si plusieurs serveurs CookCLI
  */
 
+class CookCliDashboardStrategy extends HTMLElement {
+  static getCreateSuggestions() {
+    return { title: "Recettes", icon: "mdi:chef-hat" };
+  }
+
+  static async generate(config, hass) {
+    config = config || {};
+
+    const wsMsg = { type: "cookcli/recipes" };
+    if (config.entry_id) wsMsg.entry_id = config.entry_id;
+
+    let recipes = [];
+    try {
+      const result = await hass.connection.sendMessagePromise(wsMsg);
+      recipes = result.recipes || [];
+    } catch (err) {
+      // Liste vide plutôt que planter tout le dashboard ; la carte affichera
+      // son propre message d'erreur au prochain essai de fetch côté carte.
+    }
+
+    const listView = {
+      title: config.title || "Recettes",
+      path: "recettes",
+      cards: [
+        {
+          type: "custom:cookcli-card",
+          title: config.title || "Mes recettes",
+          entry_id: config.entry_id,
+        },
+      ],
+    };
+
+    const recipeViews = recipes.map((recipe) => ({
+      path: recipe.view_path,
+      subview: true,
+      strategy: {
+        type: "custom:cookcli-recipe",
+        path: recipe.path,
+        timer_entity: config.timer_entity,
+        entry_id: config.entry_id,
+      },
+    }));
+
+    return {
+      title: config.title || "Recettes",
+      views: [listView, ...recipeViews],
+    };
+  }
+}
+
+/**
+ * View strategy : génère le contenu de la vue d'UNE recette. `config.path`
+ * est fourni par la dashboard strategy ci-dessus ; utilisable seule (une vue
+ * par recette écrite à la main) en le fixant directement dans le YAML.
+ */
 class CookCliRecipeViewStrategy extends HTMLElement {
   static async generate(config, hass) {
     config = config || {};
-    const params = new URLSearchParams(window.location.search);
-    const path = config.path || params.get("path");
+    const path = config.path;
 
     if (!path) {
       return {
@@ -202,8 +254,9 @@ class CookCliRecipeViewStrategy extends HTMLElement {
    * `duration` peut être un nombre (secondes/minutes selon `unit`) ou du
    * texte libre façon "2-3 minutes" (Cooklang autorise les plages en texte
    * libre) — dans ce cas on prend le premier nombre trouvé, ce qui donne une
-   * estimation basse ; ajustable ensuite via les boutons +/- de
-   * simple-timer-card ou l'éditeur de durée intégré.
+   * estimation basse ; ajustable ensuite via circular-timer-card (tap =
+   * toggle, double-tap = annuler, appui long = plus d'infos) ou en relançant
+   * timer.start avec une autre durée.
    */
   static _parseDurationSeconds(duration, unit) {
     let value = null;
@@ -239,4 +292,14 @@ class CookCliRecipeViewStrategy extends HTMLElement {
   }
 }
 
+customElements.define("ll-strategy-dashboard-cookcli", CookCliDashboardStrategy);
 customElements.define("ll-strategy-view-cookcli-recipe", CookCliRecipeViewStrategy);
+
+window.customStrategies = window.customStrategies || [];
+window.customStrategies.push({
+  type: "cookcli",
+  strategyType: "dashboard",
+  name: "CookCLI",
+  description: "Dashboard de recettes CookCLI : liste + une vue par recette.",
+  documentationURL: "https://git.thethomaas.net/TheThomaas/ha-cookcli",
+});

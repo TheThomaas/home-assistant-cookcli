@@ -16,10 +16,16 @@ cookcli/recipe repeuple aussi l'entité todo d'ingrédients (todo.py) avec les
 ingrédients de la recette ouverte, et renvoie son entity_id dans
 "todo_entity_id" pour que le frontend puisse l'afficher avec la carte
 native `todo-list`.
+
+cookcli/recipes inclut "view_path" par recette : le slug utilisé comme path
+de vue HA, calculé une seule fois ici (voir _view_path) pour que
+cookcli-card.js et la dashboard strategy (cookcli-recipe-strategy.js)
+naviguent vers le même identifiant sans dupliquer la logique de slug.
 """
 
 from __future__ import annotations
 
+import re
 from urllib.parse import quote
 
 import voluptuous as vol
@@ -46,6 +52,20 @@ def _image_url(entry_id: str, image_ref: str | None) -> str | None:
     if not image_ref:
         return None
     return f"/api/cookcli/image/{entry_id}/{quote(image_ref, safe='/')}"
+
+
+def _view_path(recipe_path: str) -> str:
+    """Slug utilisé comme path de vue HA pour cette recette.
+
+    Calculé une fois ici et renvoyé au frontend (dans "view_path"), pour que
+    cookcli-card.js et la dashboard strategy utilisent exactement le même
+    identifiant sans dupliquer cette logique en JS des deux côtés.
+    Ne gère pas les collisions entre deux recettes qui se slugifieraient
+    pareil (rare en pratique, mais à garder en tête).
+    """
+    base = re.sub(r"\.cook$", "", recipe_path, flags=re.IGNORECASE)
+    slug = re.sub(r"[^a-zA-Z0-9]+", "-", base).strip("-").lower()
+    return slug or "recette"
 
 
 def _ingredient_summaries(ingredients: list[dict]) -> list[str]:
@@ -85,6 +105,7 @@ async def ws_list_recipes(
         recipes.append(
             {
                 "path": r.path,
+                "view_path": _view_path(r.path),
                 "name": r.name,
                 "time": metadata.get("time"),
                 "servings": metadata.get("servings"),

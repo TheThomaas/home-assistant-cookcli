@@ -1,26 +1,40 @@
 /**
  * Carte Lovelace pour l'intégration CookCLI — liste navigable des recettes.
  *
- * Le détail d'une recette n'est plus géré par cette carte : un clic sur une
- * ligne navigue vers une vue générée par cookcli-recipe-strategy.js (voir ce
- * fichier), qui affiche étapes/ingrédients/minuteur via des cartes natives
- * et des cartes tierces (tabdeck-card, simple-timer-card).
+ * Le détail d'une recette est une VUE DISTINCTE par recette (path = le
+ * "view_path" renvoyé par le backend), générée par une dashboard strategy
+ * (voir cookcli-recipe-strategy.js). C'est nécessaire : une view strategy ne
+ * régénère son contenu qu'au montage de la vue, pas à chaque changement de
+ * l'URL — avec une seule vue partagée + un paramètre `?path=`, il fallait
+ * recharger la page pour voir une autre recette. Une vraie vue par recette
+ * force un remontage à chaque navigation, donc ça marche en SPA normal.
  *
- * Consomme cookcli/recipes (path, name, time, servings, tags, image_url).
+ * Consomme cookcli/recipes (path, view_path, name, time, servings, tags,
+ * image_url).
  *
  * Installation :
  * 1. Copie ce fichier dans config/www/cookcli-card.js
  * 2. Paramètres -> Tableaux de bord -> menu ⋮ -> Ressources -> Ajouter :
  *    URL "/local/cookcli-card.js", type "Module JavaScript"
- * 3. Ajoute une carte manuelle sur un tableau de bord :
+ * 3. Cette carte est normalement insérée automatiquement par la dashboard
+ *    strategy cookcli-recipe-strategy.js — voir son README pour la config
+ *    complète du tableau de bord. Utilisable aussi seule en carte manuelle,
+ *    y compris sur un AUTRE tableau de bord que celui des recettes :
  *    type: custom:cookcli-card
  *    title: Mes recettes
- *    detail_view_path: recette   # doit correspondre au "path" de la vue de détail
+ *    dashboard_path: test-cuisine   # optionnel — voir plus bas
+ *
+ * Par défaut, un clic navigue vers une vue du tableau de bord COURANT (celui
+ * où la carte est affichée). Si tu places cette carte sur un autre tableau
+ * de bord que celui qui contient les vues générées par la dashboard
+ * strategy (ex: carte sur /lovelace, vues sur /test-cuisine), précise
+ * `dashboard_path: test-cuisine` pour que la navigation cible le bon
+ * tableau de bord plutôt que celui où la carte est physiquement posée.
  */
 
 class CookCliCard extends HTMLElement {
   static getStubConfig() {
-    return { title: "Recettes", detail_view_path: "recette" };
+    return { title: "Recettes" };
   }
 
   setConfig(config) {
@@ -64,12 +78,13 @@ class CookCliCard extends HTMLElement {
     }
   }
 
-  _navigateToRecipe(path) {
-    const detailPath = this._config.detail_view_path || "recette";
-    // Racine du dashboard courant, ex: "/lovelace-cookcli" depuis
-    // "/lovelace-cookcli/recettes" — on y accroche la vue de détail.
-    const dashboardRoot = window.location.pathname.split("/").slice(0, 2).join("/");
-    const url = `${dashboardRoot}/${detailPath}?path=${encodeURIComponent(path)}`;
+  _navigateToView(viewPath) {
+    const dashboardRoot = this._config.dashboard_path
+      ? `/${this._config.dashboard_path.replace(/^\/+|\/+$/g, "")}`
+      // Racine du dashboard courant, ex: "/lovelace-cookcli" depuis
+      // "/lovelace-cookcli/recettes" — on y accroche la vue de la recette.
+      : window.location.pathname.split("/").slice(0, 2).join("/");
+    const url = `${dashboardRoot}/${viewPath}`;
 
     // Navigation interne HA, sans recharger la page (comme un tap_action navigate).
     window.history.pushState(null, "", url);
@@ -77,9 +92,9 @@ class CookCliCard extends HTMLElement {
   }
 
   _onClick(event) {
-    const itemEl = event.target.closest("[data-path]");
+    const itemEl = event.target.closest("[data-view-path]");
     if (itemEl) {
-      this._navigateToRecipe(itemEl.dataset.path);
+      this._navigateToView(itemEl.dataset.viewPath);
     }
   }
 
@@ -109,7 +124,7 @@ class CookCliCard extends HTMLElement {
           ? `<img class="recipe-thumb" src="${this._escape(r.image_url)}" alt="" loading="lazy" onerror="this.style.display='none'">`
           : `<div class="recipe-thumb recipe-thumb-placeholder"></div>`;
         return `
-          <div class="recipe-row" data-path="${this._escape(r.path)}">
+          <div class="recipe-row" data-view-path="${this._escape(r.view_path)}">
             ${thumb}
             <div class="recipe-row-text">
               <div class="recipe-name">${this._escape(r.name)}</div>
