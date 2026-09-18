@@ -25,11 +25,13 @@ naviguent vers le même identifiant sans dupliquer la logique de slug.
 
 from __future__ import annotations
 
+from datetime import timedelta
 import re
 from urllib.parse import quote
 
 import voluptuous as vol
 from homeassistant.components import websocket_api
+from homeassistant.components.http.auth import async_sign_path
 from homeassistant.core import HomeAssistant
 
 from .api import CookCliApiError
@@ -48,11 +50,11 @@ def _resolve_entry(
     return None, None
 
 
-def _image_url(entry_id: str, image_ref: str | None) -> str | None:
+def _image_url(hass: HomeAssistant, entry_id: str, image_ref: str | None) -> str | None:
     if not image_ref:
         return None
-    return f"/api/cookcli/image/{entry_id}/{quote(image_ref, safe='/')}"
-
+    raw_path = f"/api/cookcli/image/{entry_id}/{quote(image_ref, safe='/')}"
+    return async_sign_path(hass, raw_path, timedelta(hours=1))
 
 def _view_path(recipe_path: str) -> str:
     """Slug utilisé comme path de vue HA pour cette recette.
@@ -110,7 +112,7 @@ async def ws_list_recipes(
                 "time": metadata.get("time"),
                 "servings": metadata.get("servings"),
                 "tags": metadata.get("tags", []),
-                "image_url": _image_url(entry_id, metadata.get("image")),
+                "image_url": _image_url(hass, entry_id, metadata.get("image")),
             }
         )
     connection.send_result(msg["id"], {"recipes": recipes})
@@ -139,7 +141,7 @@ async def ws_get_recipe(
         connection.send_error(msg["id"], "cannot_connect", str(err))
         return
 
-    recipe["image_url"] = _image_url(entry_id, recipe.get("image"))
+    recipe["image_url"] = _image_url(hass, entry_id, recipe.get("image"))
 
     todo_entity = entry_data.get("todo_entity")
     if todo_entity is not None:
