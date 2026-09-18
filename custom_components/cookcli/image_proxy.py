@@ -24,7 +24,7 @@ _LOGGER = logging.getLogger(__name__)
 class CookCliImageView(HomeAssistantView):
     """GET /api/cookcli/image/{entry_id}/{image_ref} -> octets de l'image."""
 
-    url = "/api/cookcli/image/{entry_id}/{image_ref:.*}"
+    url = "/api/cookcli/image/{entry_id}{image_ref:.*}"
     name = "api:cookcli:image"
     requires_auth = True
 
