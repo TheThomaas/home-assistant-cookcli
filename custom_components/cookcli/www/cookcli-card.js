@@ -42,6 +42,7 @@ class CookCliCard extends HTMLElement {
     this._recipes = null;
     this._loading = false;
     this._error = null;
+    this._lastFetch = 0;
 
     if (!this.shadowRoot) {
       this.attachShadow({ mode: "open" });
@@ -50,9 +51,38 @@ class CookCliCard extends HTMLElement {
     this._render();
   }
 
+  /**
+  * Éditeur de configuration automatique intégré à Home Assistant.
+  * HA utilise ce schéma pour générer le formulaire visuel.
+  */
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: "title", selector: { text: {} }, label: "Titre" },
+        { name: "dashboard_path", selector: { text: {} }, label: "Chemin du dashboard", helper: "Laisser vide pour le dashboard courant" },
+        { name: "entry_id", selector: { text: {} }, label: "Entry ID", helper: "Optionnel — si plusieurs serveurs CookCLI" },
+      ],
+    };
+  }
+
   set hass(hass) {
     this._hass = hass;
     if (this._recipes === null && !this._loading) {
+      this._fetchRecipes();
+    }
+  }
+
+  /**
+   * Vérifie si les signatures d'images risquent d'avoir expiré.
+   * Si le dernier chargement date de plus de 45 minutes, on relance une requête propre.
+   */
+  _checkAndRefresh() {
+    if (this._loading || !this._recipes) return;
+    
+    const now = Date.now();
+    const fortyFiveMinutes = 45 * 60 * 1000;
+    
+    if (now - this._lastFetch > fortyFiveMinutes) {
       this._fetchRecipes();
     }
   }
@@ -70,6 +100,7 @@ class CookCliCard extends HTMLElement {
       if (this._config.entry_id) msg.entry_id = this._config.entry_id;
       const result = await this._hass.connection.sendMessagePromise(msg);
       this._recipes = result.recipes || [];
+      this._lastFetch = Date.now();
     } catch (err) {
       this._error = (err && err.message) || "Erreur inconnue";
     } finally {
@@ -105,28 +136,28 @@ class CookCliCard extends HTMLElement {
   }
 
   _renderList() {
-    if (this._loading) {
+    if (this._loading && !this._recipes) {
       return `<div class="state-msg">Chargement…</div>`;
     }
-    if (this._error) {
+    if (this._error && !this._recipes) {
       return `<div class="state-msg error">${this._escape(this._error)}</div>`;
     }
     if (!this._recipes || this._recipes.length === 0) {
       return `<div class="state-msg">Aucune recette trouvée.</div>`;
     }
 
-    const rows = this._recipes
+    const cards = this._recipes
       .map((r) => {
         const meta = [];
         if (r.time) meta.push(`<span>⏱ ${this._escape(r.time)}</span>`);
         if (r.servings) meta.push(`<span>🍽 ${this._escape(String(r.servings))}</span>`);
         const thumb = r.image_url
-          ? `<img class="recipe-thumb" src="${this._escape(r.image_url)}" alt="" loading="lazy" onerror="this.style.display='none'">`
+          ? `<img class="recipe-thumb" src="${this._escape(r.image_url)}" alt="" loading="lazy" onerror="this.style.background='var(--divider-color)';this.removeAttribute('src')">`
           : `<div class="recipe-thumb recipe-thumb-placeholder"></div>`;
         return `
-          <div class="recipe-row" data-view-path="${this._escape(r.view_path)}">
+          <div class="recipe-card" data-view-path="${this._escape(r.view_path)}">
             ${thumb}
-            <div class="recipe-row-text">
+            <div class="recipe-card-text">
               <div class="recipe-name">${this._escape(r.name)}</div>
               <div class="recipe-meta">${meta.join("")}</div>
             </div>
@@ -134,7 +165,7 @@ class CookCliCard extends HTMLElement {
       })
       .join("");
 
-    return `<div class="recipe-list">${rows}</div>`;
+    return `<div class="recipe-grid">${cards}</div>`;
   }
 
   _render() {
@@ -153,27 +184,65 @@ class CookCliCard extends HTMLElement {
       .card-content { padding: 0 16px 16px; }
       .state-msg { padding: 16px 0; color: var(--secondary-text-color); }
       .state-msg.error { color: var(--error-color, #db4437); }
-      .recipe-list { display: flex; flex-direction: column; }
-      .recipe-row {
-        display: flex; align-items: center; gap: 12px;
-        padding: 10px 4px; border-bottom: 1px solid var(--divider-color);
+
+      /* Grille responsive : 1 colonne par défaut (mobile),
+         puis 2 / 3 / 4 colonnes selon la largeur disponible. */
+      .recipe-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(225px, 1fr));
+        gap: 12px;
+      }
+
+      .recipe-card {
+        display: flex;
+        flex-direction: column;
+        background: var(--card-background-color);
+        border-radius: 12px;
+        overflow: hidden;
         cursor: pointer;
+        border: 1px solid var(--divider-color);
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
       }
-      .recipe-row:last-child { border-bottom: none; }
-      .recipe-row:hover { background: var(--secondary-background-color); }
+      .recipe-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      }
+      .recipe-card:hover .recipe-name {
+        color: var(--primary-color);
+      }
+
       .recipe-thumb {
-        width: 56px; height: 56px; border-radius: 8px; object-fit: cover;
-        flex-shrink: 0; background: var(--secondary-background-color);
+        width: 100%;
+        aspect-ratio: 16 / 10;
+        object-fit: cover;
+        display: block;
+        background: var(--secondary-background-color);
+        flex-shrink: 0;
       }
-      .recipe-thumb-placeholder { background: var(--divider-color); }
-      .recipe-row-text { min-width: 0; }
+      .recipe-thumb-placeholder {
+        background: var(--divider-color);
+      }
+
+      .recipe-card-text {
+        padding: 10px 12px 12px;
+        min-width: 0;
+      }
       .recipe-name {
-        font-weight: 500; color: var(--primary-text-color);
-        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        font-weight: 500;
+        color: var(--primary-text-color);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        margin-bottom: 4px;
       }
       .recipe-meta {
-        display: flex; gap: 12px; font-size: 0.85em;
-        color: var(--secondary-text-color); white-space: nowrap;
+        display: flex;
+        gap: 12px;
+        font-size: 0.85em;
+        color: var(--secondary-text-color);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
     `;
   }
@@ -185,5 +254,6 @@ window.customCards = window.customCards || [];
 window.customCards.push({
   type: "cookcli-card",
   name: "CookCLI Recipes",
+  preview: false,
   description: "Liste navigable de tes recettes CookCLI.",
 });
