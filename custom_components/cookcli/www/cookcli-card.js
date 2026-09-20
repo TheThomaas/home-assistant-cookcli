@@ -44,6 +44,8 @@ class CookCliCard extends HTMLElement {
     this._error = null;
     this._lastFetch = 0;
     this._selectedTag = null;
+    this._reloading = false;
+    this._reloadError = null;
 
     if (!this.shadowRoot) {
       this.attachShadow({ mode: "open" });
@@ -77,6 +79,7 @@ class CookCliCard extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
+    this._subscribe();
     if (this._recipes === null && !this._loading) {
       this._fetchRecipes();
     }
@@ -136,6 +139,10 @@ class CookCliCard extends HTMLElement {
   }
 
   _onClick(event) {
+    if (event.target.closest("[data-action='reload']")) {
+      this._reload();
+      return;
+    }
     if (event.target.closest("[data-tag-clear]")) {
       this._selectedTag = null;
       this._render();
@@ -191,6 +198,63 @@ class CookCliCard extends HTMLElement {
     }
     if (!this._tagFilterEnabled() || this._selectedTag === null) return this._recipes;
     return this._recipes.filter((r) => this._tagsOf(r).includes(this._selectedTag));
+  }
+
+  connectedCallback() {
+    this._subscribe();
+  }
+
+  disconnectedCallback() {
+    if (this._unsub) {
+      this._unsub();
+      this._unsub = null;
+    }
+  }
+
+  async _subscribe() {
+    if (this._unsub || this._subscribing || !this._hass || !this.isConnected) return;
+    this._subscribing = true;
+    try {
+      this._unsub = await this._hass.connection.subscribeEvents(
+        (ev) => this._onReloaded(ev),
+        "cookcli_reloaded"
+      );
+    } catch (err) {
+      // Pas d'abonnement : le bouton retombe sur un rafraîchissement manuel.
+    } finally {
+      this._subscribing = false;
+    }
+    // La carte a pu être retirée du DOM pendant l'attente.
+    if (!this.isConnected && this._unsub) {
+      this._unsub();
+      this._unsub = null;
+    }
+  }
+
+  _onReloaded(ev) {
+    const target = this._config.entry_id;
+    if (target && ev.data && ev.data.entry_id !== target) return;
+    this._fetchRecipes();
+  }
+
+  async _reload() {
+    if (this._reloading || !this._hass) return;
+    this._reloading = true;
+    this._reloadError = null;
+    this._render();
+    try {
+      const data = {};
+      if (this._config.entry_id) data.entry_id = this._config.entry_id;
+      await this._hass.callService("cookcli", "reload", data);
+      // Normalement l'événement a déjà déclenché le rechargement ;
+      // on ne le refait à la main que si l'abonnement a échoué.
+      if (!this._unsub) await this._fetchRecipes();
+    } catch (err) {
+      this._reloadError = (err && err.message) || "Échec du rechargement";
+    } finally {
+      this._reloading = false;
+      this._render();
+    }
   }
 
   _renderTagFilter() {
@@ -255,10 +319,24 @@ class CookCliCard extends HTMLElement {
     const title = this._config.title || "Recettes";
     const previous = this.shadowRoot.querySelector(".tag-filter");
     const scrollLeft = previous ? previous.scrollLeft : 0;
-
+    const errorMsg = this._reloadError
+      ? `<div class="state-msg error reload-error">${this._escape(this._reloadError)}</div>`
+      : "";
     this.shadowRoot.innerHTML = `
       <style>${this._styles()}</style>
-      <ha-card header="${this._escape(title)}">
+      <ha-card>
+        <div class="card-header">
+          <span class="card-title">${this._escape(title)}</span>
+          <ha-icon-button
+            class="reload-btn ${this._reloading ? "spinning" : ""}"
+            data-action="reload"
+            label="Recharger les recettes"
+            ${this._reloading ? "disabled" : ""}
+          >
+            <ha-icon icon="mdi:refresh"></ha-icon>
+          </ha-icon-button>
+        </div>
+        ${errorMsg}
         <div class="card-content">${this._renderList()}</div>
       </ha-card>
     `;
@@ -332,6 +410,20 @@ class CookCliCard extends HTMLElement {
         overflow: hidden;
         text-overflow: ellipsis;
       }
+      .card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 8px 8px 16px;
+        color: var(--ha-card-header-color, var(--primary-text-color));
+        font-family: var(--ha-card-header-font-family, inherit);
+        font-size: var(--ha-card-header-font-size, 24px);
+        line-height: 32px;
+      }
+      .reload-error { padding: 0 16px 8px; }
+      .reload-btn.spinning ha-icon { animation: cookcli-spin 1s linear infinite; }
+      @keyframes cookcli-spin { to { transform: rotate(360deg); } }
+      
       .tag-filter {
         display: flex;
         flex-wrap: nowrap;

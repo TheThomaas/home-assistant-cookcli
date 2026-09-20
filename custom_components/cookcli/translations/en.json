@@ -30,5 +30,17 @@
         }
       }
     }
+  },
+  "services": {
+    "reload": {
+      "name": "Reload recipes",
+      "description": "Sync recipes from git repository in the addon.",
+      "fields": {
+        "entry_id": {
+          "name": "CookCLI Server",
+          "description": "Leave empty to reload all servers."
+        }
+      }
+    }
   }
 }

@@ -6,6 +6,7 @@ CONF_HOST = "host"
 CONF_PORT = "port"
 
 DEFAULT_PORT = 9081
+RELOAD_PORT = 8098
 
 # Nom du service tel que poussé par bashio::discovery.set côté add-on
 HASSIO_DISCOVERY_SLUG = "cookcli"

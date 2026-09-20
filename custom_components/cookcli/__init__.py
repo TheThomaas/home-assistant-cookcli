@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+import voluptuous as vol
 
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
 
@@ -106,6 +108,35 @@ async def async_setup(hass: HomeAssistant, config) -> bool:
     hass.bus.async_listen_once(
         EVENT_HOMEASSISTANT_STARTED, _register_card_resources
     )
+
+    async def _handle_reload(call: ServiceCall) -> None:
+        """cookcli.reload : resynchronise l'add-on puis rafraîchit la liste."""
+        entries = hass.data.get(DOMAIN, {})
+        requested = call.data.get("entry_id")
+
+        if requested is not None:
+            if requested not in entries:
+                raise ServiceValidationError(f"Serveur CookCLI inconnu : {requested}")
+            targets = {requested: entries[requested]}
+        else:
+            targets = dict(entries)
+
+        for entry_id, data in targets.items():
+            try:
+                await data["client"].async_reload()
+            except CookCliApiError as err:
+                raise HomeAssistantError(f"Reload CookCLI impossible : {err}") from err
+            await data["coordinator"].async_refresh()
+            # Les cartes ouvertes écoutent cet événement pour recharger leur liste.
+            hass.bus.async_fire(f"{DOMAIN}_reloaded", {"entry_id": entry_id})
+
+    hass.services.async_register(
+        DOMAIN,
+        "reload",
+        _handle_reload,
+        schema=vol.Schema({vol.Optional("entry_id"): str}),
+    )
+
     return True
 
 

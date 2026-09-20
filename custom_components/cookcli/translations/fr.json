@@ -30,5 +30,17 @@
         }
       }
     }
+  },
+  "services": {
+    "reload": {
+      "name": "Recharger les recettes",
+      "description": "Resynchronise les recettes depuis le dépôt git de l'add-on.",
+      "fields": {
+        "entry_id": {
+          "name": "Serveur CookCLI",
+          "description": "Laisser vide pour recharger tous les serveurs."
+        }
+      }
+    }
   }
 }

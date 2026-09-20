@@ -58,12 +58,14 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from typing import Any
 
+from .const import RELOAD_PORT
+
 import aiohttp
 
 _LOGGER = logging.getLogger(__name__)
 
 DEFAULT_TIMEOUT = aiohttp.ClientTimeout(total=10)
-
+RELOAD_TIMEOUT = aiohttp.ClientTimeout(total=120)
 
 class CookCliApiError(Exception):
     """Erreur générique lors d'un appel à l'API CookCLI."""
@@ -92,6 +94,7 @@ class CookCliApiClient:
     def __init__(self, session: aiohttp.ClientSession, host: str, port: int) -> None:
         self._session = session
         self._base_url = f"http://{host}:{port}/api"
+        self._reload_url = f"http://{host}:{RELOAD_PORT}/reload"
 
     async def async_test_connection(self) -> None:
         """Vérifie que le serveur répond, utilisé par le config_flow."""
@@ -112,6 +115,10 @@ class CookCliApiClient:
         """
         data = await self._request_json(f"/recipes/{path}")
         return _resolve_recipe(data)
+
+    async def async_reload(self) -> None:
+        async with self._get(self._reload_url, method="POST", timeout=RELOAD_TIMEOUT):
+            pass
 
     async def async_get_image(self, image_ref: str) -> tuple[bytes, str | None]:
         """Récupère les octets d'une image statique CookCLI.
@@ -143,13 +150,16 @@ class CookCliApiClient:
         return f"/static/{image_ref}"
 
     @asynccontextmanager
-    async def _get(self, endpoint: str):
-        """Contexte partagé pour un GET vers CookCLI, avec gestion d'erreurs."""
-        url = f"{self._base_url}{endpoint}"
+    async def _get(
+        self,
+        endpoint: str,
+        method: str = "GET",
+        timeout: aiohttp.ClientTimeout = DEFAULT_TIMEOUT,
+    ):
+        """Contexte partagé pour un appel vers CookCLI, avec gestion d'erreurs."""
+        url = endpoint if endpoint.startswith("http") else f"{self._base_url}{endpoint}"
         try:
-            async with self._session.request(
-                "GET", url, timeout=DEFAULT_TIMEOUT
-            ) as resp:
+            async with self._session.request(method, url, timeout=timeout) as resp:
                 if resp.status >= 400:
                     raise CookCliResponseError(
                         f"CookCLI a répondu {resp.status} pour {url}"
