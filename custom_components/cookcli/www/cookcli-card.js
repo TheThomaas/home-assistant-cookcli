@@ -52,17 +52,12 @@ class CookCliCard extends HTMLElement {
   }
 
   /**
-  * Éditeur de configuration automatique intégré à Home Assistant.
-  * HA utilise ce schéma pour générer le formulaire visuel.
-  */
-  static getConfigForm() {
-    return {
-      schema: [
-        { name: "title", selector: { text: {} }, label: "Titre" },
-        { name: "dashboard_path", selector: { text: {} }, label: "Chemin du dashboard", helper: "Laisser vide pour le dashboard courant" },
-        { name: "entry_id", selector: { text: {} }, label: "Entry ID", helper: "Optionnel — si plusieurs serveurs CookCLI" },
-      ],
-    };
+   * Éditeur visuel : élément dédié (voir CookCliCardEditor plus bas) plutôt
+   * que getConfigForm(), dont le schéma est statique et n'a pas accès à
+   * hass — or la liste des dashboards disponibles en dépend.
+   */
+  static getConfigElement() {
+    return document.createElement("cookcli-card-editor");
   }
 
   set hass(hass) {
@@ -248,7 +243,135 @@ class CookCliCard extends HTMLElement {
   }
 }
 
+/**
+ * Éditeur visuel de la carte (ha-form + sélecteurs natifs).
+ *
+ * "Chemin du dashboard" propose les dashboards Lovelace du serveur, lus dans
+ * hass.panels (accessible à tous les utilisateurs, contrairement à
+ * lovelace/dashboards/list qui demande les droits admin). custom_value reste
+ * activé pour pouvoir saisir un chemin qui n'apparaît pas dans la liste.
+ */
+const COOKCLI_CARD_EDITOR_FIELDS = ["title", "dashboard_path", "entry_id"];
+
+const COOKCLI_CARD_EDITOR_LABELS = {
+  title: "Titre",
+  dashboard_path: "Dashboard des recettes",
+  entry_id: "Serveur CookCLI",
+};
+
+const COOKCLI_CARD_EDITOR_HELPERS = {
+  title: "Titre de la carte. Par défaut : « Recettes ».",
+  dashboard_path:
+    "Seulement si la carte n'est pas sur le dashboard qui contient les vues recettes. Vide = dashboard courant.",
+  entry_id:
+    "Seulement si tu as plusieurs serveurs CookCLI. Vide = le serveur par défaut.",
+};
+
+class CookCliCardEditor extends HTMLElement {
+  constructor() {
+    super();
+    this._config = {};
+    this._hass = undefined;
+    this._form = null;
+    this._optionsSignature = null;
+  }
+
+  setConfig(config) {
+    this._config = config || {};
+    this._update();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this._update();
+  }
+
+  connectedCallback() {
+    this._ensureForm();
+    this._update();
+  }
+
+  _dashboardOptions() {
+    const panels = (this._hass && this._hass.panels) || {};
+    return Object.values(panels)
+      .filter((p) => p.component_name === "lovelace" && p.url_path)
+      .map((p) => ({
+        value: p.url_path,
+        label: p.title ? `${p.title} (${p.url_path})` : p.url_path,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }
+
+  _buildSchema(options) {
+    return [
+      { name: "title", selector: { text: {} } },
+      {
+        name: "dashboard_path",
+        selector: { select: { options, custom_value: true, mode: "dropdown" } },
+      },
+      { name: "entry_id", selector: { config_entry: { integration: "cookcli" } } },
+    ];
+  }
+
+  _ensureForm() {
+    if (this._form) return;
+    const form = document.createElement("ha-form");
+    const options = this._dashboardOptions();
+    this._optionsSignature = JSON.stringify(options);
+    form.schema = this._buildSchema(options);
+    form.computeLabel = (schema) => COOKCLI_CARD_EDITOR_LABELS[schema.name] || schema.name;
+    form.computeHelper = (schema) => COOKCLI_CARD_EDITOR_HELPERS[schema.name] || "";
+    form.addEventListener("value-changed", (ev) => this._valueChanged(ev));
+    this.appendChild(form);
+    this._form = form;
+  }
+
+  // Formulaire créé une fois ; on ne met à jour que ses propriétés. Le schéma
+  // n'est reconstruit que si la liste des dashboards a changé (hass, lui,
+  // change en permanence).
+  _update() {
+    if (!this._form) return;
+    if (this._hass) {
+      this._form.hass = this._hass;
+      const options = this._dashboardOptions();
+      const signature = JSON.stringify(options);
+      if (signature !== this._optionsSignature) {
+        this._optionsSignature = signature;
+        this._form.schema = this._buildSchema(options);
+      }
+    }
+    const data = {};
+    for (const name of COOKCLI_CARD_EDITOR_FIELDS) {
+      if (this._config[name] !== undefined) data[name] = this._config[name];
+    }
+    this._form.data = data;
+  }
+
+  _valueChanged(ev) {
+    ev.stopPropagation();
+    const value = ev.detail.value || {};
+
+    // Garde `type` et toute clé inconnue ; un champ vidé est supprimé.
+    const config = { ...this._config };
+    for (const name of COOKCLI_CARD_EDITOR_FIELDS) {
+      const v = value[name];
+      if (v === undefined || v === null || v === "") delete config[name];
+      else config[name] = v;
+    }
+
+    this._config = config;
+    this.dispatchEvent(
+      new CustomEvent("config-changed", {
+        detail: { config },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+}
+
 customElements.define("cookcli-card", CookCliCard);
+customElements.define("cookcli-card-editor", CookCliCardEditor);
 
 window.customCards = window.customCards || [];
 window.customCards.push({

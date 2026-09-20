@@ -41,7 +41,8 @@
  * - custom:mod-card (card-mod)  : force le ratio 30/70 des colonnes d'étape
  * - custom:cookcli-card         : la liste (voir cookcli-card.js)
  *
- * Configuration du tableau de bord (remplace le contenu YAML du dashboard) :
+ * Configuration du tableau de bord (éditable aussi via l'éditeur visuel,
+ * voir CookcliStrategyEditor ; sinon remplace le contenu YAML du dashboard) :
  *   strategy:
  *     type: custom:cookcli
  *     title: Recettes
@@ -405,77 +406,111 @@ class CookCliRecipeViewStrategy extends HTMLElement {
   }
 }
 
+/**
+ * Éditeur visuel de la dashboard strategy (remplace l'édition YAML).
+ *
+ * Basé sur <ha-form> + sélecteurs natifs HA : mêmes composants, même rendu
+ * que les éditeurs des cartes officielles (thème, sélecteurs d'entités,
+ * traductions). Aucune dépendance Lit : on manipule directement l'élément.
+ *
+ * Contrat HA pour un éditeur de strategy :
+ *   - setConfig(config)  → reçoit la config courante
+ *   - set hass(hass)     → reçoit l'objet hass (mis à jour très souvent)
+ *   - événement "config-changed" { detail: { config } } → sauvegarde
+ */
+const COOKCLI_EDITOR_SCHEMA = [
+  { name: "title", selector: { text: {} } },
+  { name: "timer_entity", selector: { entity: { domain: "timer" } } },
+  { name: "step_entity", selector: { entity: { domain: "input_number" } } },
+  { name: "entry_id", selector: { config_entry: { integration: "cookcli" } } },
+];
+
+const COOKCLI_EDITOR_LABELS = {
+  title: "Titre du dashboard",
+  timer_entity: "Minuteur",
+  step_entity: "Étape en cours",
+  entry_id: "Serveur CookCLI",
+};
+
+const COOKCLI_EDITOR_HELPERS = {
+  title: "Titre de la liste et du dashboard. Par défaut : « Recettes ».",
+  timer_entity:
+    "Aide « Minuteur » partagée entre toutes les recettes (ex. timer.recette_en_cours). Vide = pas de boutons de minuteur.",
+  step_entity:
+    "Aide « Nombre » qui pilote l'onglet actif (ex. input_number.recette_etape). Vide = pas de boutons Commencer / Précédent / Suivant.",
+  entry_id:
+    "Seulement si tu as plusieurs serveurs CookCLI. Vide = le serveur par défaut.",
+};
+
 class CookcliStrategyEditor extends HTMLElement {
+  constructor() {
+    super();
+    this._config = {};
+    this._hass = undefined;
+    this._form = null;
+  }
+
   setConfig(config) {
-    this._config = config;
+    this._config = config || {};
+    this._update();
   }
 
   set hass(hass) {
     this._hass = hass;
+    this._update();
   }
 
-  // Appelé automatiquement quand l'élément est inséré dans le DOM
   connectedCallback() {
-    this._render();
+    this._ensureForm();
+    this._update();
   }
 
-  _render() {
-    console.log("Editor render appelé", this._config, this._hass);
+  _ensureForm() {
+    if (this._form) return;
+    const form = document.createElement("ha-form");
+    form.schema = COOKCLI_EDITOR_SCHEMA;
+    form.computeLabel = (schema) => COOKCLI_EDITOR_LABELS[schema.name] || schema.name;
+    form.computeHelper = (schema) => COOKCLI_EDITOR_HELPERS[schema.name] || "";
+    form.addEventListener("value-changed", (ev) => this._valueChanged(ev));
+    this.appendChild(form);
+    this._form = form;
+  }
 
-    // On attend d'avoir hass avant de rendre : ha-input en a besoin
-    // pour son thème et ses styles.
-    if (!this._hass) {
-      this.innerHTML = `<div style="padding:16px">Chargement…</div>`;
-      return;
+  // Le formulaire est créé une seule fois ; on ne met à jour que ses
+  // propriétés (pas de re-rendu du DOM à chaque changement de hass, ce qui
+  // ferait perdre le focus pendant la saisie).
+  _update() {
+    if (!this._form) return;
+    if (this._hass) this._form.hass = this._hass;
+    const data = {};
+    for (const { name } of COOKCLI_EDITOR_SCHEMA) {
+      if (this._config[name] !== undefined) data[name] = this._config[name];
+    }
+    this._form.data = data;
+  }
+
+  _valueChanged(ev) {
+    ev.stopPropagation();
+    const value = ev.detail.value || {};
+
+    // On part de la config existante (garde `type: custom:cookcli` et toute
+    // clé inconnue) et on ne touche qu'aux champs de l'éditeur. Un champ vidé
+    // est supprimé plutôt que stocké comme "".
+    const config = { ...this._config };
+    for (const { name } of COOKCLI_EDITOR_SCHEMA) {
+      const v = value[name];
+      if (v === undefined || v === null || v === "") delete config[name];
+      else config[name] = v;
     }
 
-    const c = this._config || {};
-
-    // Remplacer temporairement ha-textfield par des inputs natifs
-    this.innerHTML = `
-      <div style="padding: 16px; display: flex; flex-direction: column; gap: 16px;">
-        <ha-input
-          label="Titre du dashboard"
-          value="${c.title || ""}"
-          data-config-key="title"
-          helper="Titre affiché dans l'onglet"
-          style="width: 100%;"
-        ></ha-input>
-
-        <ha-input
-          label="Entité minuteur"
-          value="${c.timer_entity || ""}"
-          data-config-key="timer_entity"
-          helper="Ex: timer.recette_en_cours"
-          style="width: 100%;"
-        ></ha-input>
-
-        <ha-input
-          label="Entité étape"
-          value="${c.step_entity || ""}"
-          data-config-key="step_entity"
-          helper="Ex: input_number.recette_etape"
-          style="width: 100%;"
-        ></ha-input>
-
-        <ha-input
-          label="Entry ID (optionnel)"
-          value="${c.entry_id || ""}"
-          data-config-key="entry_id"
-          helper="Laisser vide si un seul serveur CookCLI"
-          style="width: 100%;"
-        ></ha-input>
-      </div>
-    `;
-
-    // Écouteurs natifs (change au lieu de input pour éviter les re-rendus intempestifs)
-    this.querySelectorAll("[data-config-key]").forEach((champ) => {
-      champ.addEventListener("change", (ev) => {
-        const cle = ev.target.dataset.configKey;
-        const nouvelleConfig = { ...this._config, [cle]: ev.target.value };
-        this._config = nouvelleConfig;
-      });
-    });
+    this._config = config;
+    this.dispatchEvent(
+      new CustomEvent("config-changed", {
+        detail: { config },
+        bubbles: true,
+        composed: true,
+      })
+    );
   }
 }
 
