@@ -43,10 +43,25 @@ class CookCliCard extends HTMLElement {
     this._loading = false;
     this._error = null;
     this._lastFetch = 0;
+    this._selectedTag = null;
 
     if (!this.shadowRoot) {
       this.attachShadow({ mode: "open" });
       this.shadowRoot.addEventListener("click", (event) => this._onClick(event));
+      this.shadowRoot.addEventListener(
+        "wheel",
+        (event) => {
+          const bar = event.target.closest(".tag-filter");
+          if (!bar || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+          const max = bar.scrollWidth - bar.clientWidth;
+          const atStart = bar.scrollLeft <= 0 && event.deltaY < 0;
+          const atEnd = bar.scrollLeft >= max && event.deltaY > 0;
+          if (max <= 0 || atStart || atEnd) return; // laisse la page défiler
+          event.preventDefault();
+          bar.scrollLeft += event.deltaY;
+        },
+        { passive: false }
+      );
     }
     this._render();
   }
@@ -96,6 +111,9 @@ class CookCliCard extends HTMLElement {
       const result = await this._hass.connection.sendMessagePromise(msg);
       this._recipes = result.recipes || [];
       this._lastFetch = Date.now();
+      if (this._selectedTag !== null && !this._allTags().includes(this._selectedTag)) {
+        this._selectedTag = null;
+      }
     } catch (err) {
       this._error = (err && err.message) || "Erreur inconnue";
     } finally {
@@ -118,6 +136,19 @@ class CookCliCard extends HTMLElement {
   }
 
   _onClick(event) {
+    if (event.target.closest("[data-tag-clear]")) {
+      this._selectedTag = null;
+      this._render();
+      return;
+    }
+    const tagEl = event.target.closest("[data-tag]");
+    if (tagEl) {
+      const tag = tagEl.dataset.tag;
+      // Un second clic sur la pill active revient à « Toutes ».
+      this._selectedTag = this._selectedTag === tag ? null : tag;
+      this._render();
+      return;
+    }
     const itemEl = event.target.closest("[data-view-path]");
     if (itemEl) {
       this._navigateToView(itemEl.dataset.viewPath);
@@ -128,6 +159,56 @@ class CookCliCard extends HTMLElement {
     const div = document.createElement("div");
     div.textContent = str ?? "";
     return div.innerHTML;
+  }
+
+  // Les tags peuvent arriver sous forme de tableau ou de chaîne "a, b".
+  _tagsOf(recipe) {
+    const tags = recipe.tags;
+    if (Array.isArray(tags)) return tags.map((t) => String(t).trim()).filter(Boolean);
+    if (typeof tags === "string") {
+      return tags.split(",").map((t) => t.trim()).filter(Boolean);
+    }
+    return [];
+  }
+
+  _allTags() {
+    const tags = new Set();
+    for (const r of this._recipes || []) {
+      for (const t of this._tagsOf(r)) tags.add(t);
+    }
+    return [...tags].sort((a, b) => a.localeCompare(b));
+  }
+
+  _tagFilterEnabled() {
+    // Les pills n'ont pas de sens quand un tag est déjà imposé par la config.
+    return this._config.show_tag_filter !== false && !this._config.tag;
+  }
+
+  _filteredRecipes() {
+    const fixedTag = this._config.tag;
+    if (fixedTag) {
+      return this._recipes.filter((r) => this._tagsOf(r).includes(fixedTag));
+    }
+    if (!this._tagFilterEnabled() || this._selectedTag === null) return this._recipes;
+    return this._recipes.filter((r) => this._tagsOf(r).includes(this._selectedTag));
+  }
+
+  _renderTagFilter() {
+    if (!this._tagFilterEnabled()) return "";
+    const tags = this._allTags();
+    if (tags.length === 0) return "";
+    const allActive = this._selectedTag === null;
+    const pills = tags
+      .map((t) => {
+        const active = this._selectedTag === t;
+        return `<button type="button" class="tag-pill${active ? " active" : ""}" data-tag="${this._escape(t)}" aria-pressed="${active}">${this._escape(t)}</button>`;
+      })
+      .join("");
+    return `
+      <div class="tag-filter">
+        <button type="button" class="tag-pill${allActive ? " active" : ""}" data-tag-clear aria-pressed="${allActive}">Toutes</button>
+        ${pills}
+      </div>`;
   }
 
   _renderList() {
@@ -141,7 +222,13 @@ class CookCliCard extends HTMLElement {
       return `<div class="state-msg">Aucune recette trouvée.</div>`;
     }
 
-    const cards = this._recipes
+    const filtered = this._filteredRecipes();
+    const filterBar = this._renderTagFilter();
+    if (filtered.length === 0) {
+      return `${filterBar}<div class="state-msg">Aucune recette avec ce tag.</div>`;
+    }
+
+    const cards = filtered
       .map((r) => {
         const meta = [];
         if (r.time) meta.push(`<span>⏱ ${this._escape(r.time)}</span>`);
@@ -160,18 +247,24 @@ class CookCliCard extends HTMLElement {
       })
       .join("");
 
-    return `<div class="recipe-grid">${cards}</div>`;
+    return `${filterBar}<div class="recipe-grid">${cards}</div>`;
   }
 
   _render() {
     if (!this.shadowRoot) return;
     const title = this._config.title || "Recettes";
+    const previous = this.shadowRoot.querySelector(".tag-filter");
+    const scrollLeft = previous ? previous.scrollLeft : 0;
+
     this.shadowRoot.innerHTML = `
       <style>${this._styles()}</style>
       <ha-card header="${this._escape(title)}">
         <div class="card-content">${this._renderList()}</div>
       </ha-card>
     `;
+
+    const next = this.shadowRoot.querySelector(".tag-filter");
+    if (next) next.scrollLeft = scrollLeft;
   }
 
   _styles() {
@@ -184,7 +277,7 @@ class CookCliCard extends HTMLElement {
          puis 2 / 3 / 4 colonnes selon la largeur disponible. */
       .recipe-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(225px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(225px, 1fr));
         gap: 12px;
       }
 
@@ -239,6 +332,42 @@ class CookCliCard extends HTMLElement {
         overflow: hidden;
         text-overflow: ellipsis;
       }
+      .tag-filter {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 8px;
+        margin-bottom: 12px;
+        overflow-x: auto;
+        /* Marge de fin pour que la dernière pill sorte de la zone de fondu. */
+        padding-right: 24px;
+        scrollbar-width: none;
+        -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+        mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+      }
+      .tag-filter::-webkit-scrollbar {
+        display: none;
+      }
+      .tag-pill {
+        font: inherit;
+        font-size: 0.85em;
+        padding: 4px 12px;
+        border-radius: 999px;
+        border: 1px solid var(--divider-color);
+        background: var(--card-background-color);
+        color: var(--primary-text-color);
+        cursor: pointer;
+        transition: background 0.15s ease, color 0.15s ease;
+        flex-shrink: 0;
+        white-space: nowrap;
+      }
+      .tag-pill:hover {
+        border-color: var(--primary-color);
+      }
+      .tag-pill.active {
+        background: var(--primary-color);
+        border-color: var(--primary-color);
+        color: var(--text-primary-color, #fff);
+      }
     `;
   }
 }
@@ -251,16 +380,20 @@ class CookCliCard extends HTMLElement {
  * lovelace/dashboards/list qui demande les droits admin). custom_value reste
  * activé pour pouvoir saisir un chemin qui n'apparaît pas dans la liste.
  */
-const COOKCLI_CARD_EDITOR_FIELDS = ["title", "dashboard_path", "entry_id"];
+const COOKCLI_CARD_EDITOR_FIELDS = ["title", "tag", "show_tag_filter", "dashboard_path", "entry_id"];
 
 const COOKCLI_CARD_EDITOR_LABELS = {
   title: "Titre",
+  tag: "Tag unique",
+  show_tag_filter: "Filtre par tags",
   dashboard_path: "Dashboard des recettes",
   entry_id: "Serveur CookCLI",
 };
 
 const COOKCLI_CARD_EDITOR_HELPERS = {
   title: "Titre de la carte. Par défaut : « Recettes ».",
+  tag: "N'afficher que les recettes portant ce tag. Vide = toutes les recettes.",
+  show_tag_filter: "Affiche des pills cliquables en haut de la liste pour filtrer par tag. Sans effet si un tag unique est choisi.",
   dashboard_path:
     "Seulement si la carte n'est pas sur le dashboard qui contient les vues recettes. Vide = dashboard courant.",
   entry_id:
@@ -274,15 +407,19 @@ class CookCliCardEditor extends HTMLElement {
     this._hass = undefined;
     this._form = null;
     this._optionsSignature = null;
+    this._tagOptions = [];
+    this._tagsLoadedFor = null;
   }
 
   setConfig(config) {
     this._config = config || {};
+    this._maybeLoadTags();
     this._update();
   }
 
   set hass(hass) {
     this._hass = hass;
+    this._maybeLoadTags();
     this._update();
   }
 
@@ -302,12 +439,17 @@ class CookCliCardEditor extends HTMLElement {
       .sort((a, b) => a.label.localeCompare(b.label));
   }
 
-  _buildSchema(options) {
+  _buildSchema(dashboardOptions, tagOptions) {
     return [
       { name: "title", selector: { text: {} } },
       {
+        name: "tag",
+        selector: { select: { options: tagOptions, custom_value: true, mode: "dropdown" } },
+      },
+      { name: "show_tag_filter", selector: { boolean: {} } },
+      {
         name: "dashboard_path",
-        selector: { select: { options, custom_value: true, mode: "dropdown" } },
+        selector: { select: { options: dashboardOptions, custom_value: true, mode: "dropdown" } },
       },
       { name: "entry_id", selector: { config_entry: { integration: "cookcli" } } },
     ];
@@ -317,8 +459,8 @@ class CookCliCardEditor extends HTMLElement {
     if (this._form) return;
     const form = document.createElement("ha-form");
     const options = this._dashboardOptions();
-    this._optionsSignature = JSON.stringify(options);
-    form.schema = this._buildSchema(options);
+    this._optionsSignature = JSON.stringify([options, this._tagOptions]);
+    form.schema = this._buildSchema(options, this._tagOptions);
     form.computeLabel = (schema) => COOKCLI_CARD_EDITOR_LABELS[schema.name] || schema.name;
     form.computeHelper = (schema) => COOKCLI_CARD_EDITOR_HELPERS[schema.name] || "";
     form.addEventListener("value-changed", (ev) => this._valueChanged(ev));
@@ -326,24 +468,22 @@ class CookCliCardEditor extends HTMLElement {
     this._form = form;
   }
 
-  // Formulaire créé une fois ; on ne met à jour que ses propriétés. Le schéma
-  // n'est reconstruit que si la liste des dashboards a changé (hass, lui,
-  // change en permanence).
   _update() {
     if (!this._form) return;
     if (this._hass) {
       this._form.hass = this._hass;
-      const options = this._dashboardOptions();
-      const signature = JSON.stringify(options);
-      if (signature !== this._optionsSignature) {
-        this._optionsSignature = signature;
-        this._form.schema = this._buildSchema(options);
-      }
+    }
+    const options = this._dashboardOptions();
+    const signature = JSON.stringify([options, this._tagOptions]);
+    if (signature !== this._optionsSignature) {
+      this._optionsSignature = signature;
+      this._form.schema = this._buildSchema(options, this._tagOptions);
     }
     const data = {};
     for (const name of COOKCLI_CARD_EDITOR_FIELDS) {
       if (this._config[name] !== undefined) data[name] = this._config[name];
     }
+    data.show_tag_filter = this._config.show_tag_filter !== false;
     this._form.data = data;
   }
 
@@ -356,6 +496,7 @@ class CookCliCardEditor extends HTMLElement {
     for (const name of COOKCLI_CARD_EDITOR_FIELDS) {
       const v = value[name];
       if (v === undefined || v === null || v === "") delete config[name];
+      else if (name === "show_tag_filter" && v === true) delete config[name];
       else config[name] = v;
     }
 
@@ -367,6 +508,39 @@ class CookCliCardEditor extends HTMLElement {
         composed: true,
       })
     );
+  }
+
+  // Récupère la liste des tags existants pour le sélecteur. Rechargée si le
+  // serveur (entry_id) change ; l'échec laisse simplement la liste vide, la
+  // saisie libre restant possible.
+  _maybeLoadTags() {
+    if (!this._hass) return;
+    const key = this._config.entry_id || "";
+    if (this._tagsLoadedFor === key) return;
+    this._tagsLoadedFor = key;
+
+    const msg = { type: "cookcli/recipes" };
+    if (key) msg.entry_id = key;
+    this._hass.connection
+      .sendMessagePromise(msg)
+      .then((result) => {
+        const tags = new Set();
+        for (const r of result.recipes || []) {
+          const raw = r.tags;
+          const list = Array.isArray(raw) ? raw : typeof raw === "string" ? raw.split(",") : [];
+          for (const t of list) {
+            const s = String(t).trim();
+            if (s) tags.add(s);
+          }
+        }
+        this._tagOptions = [...tags]
+          .sort((a, b) => a.localeCompare(b))
+          .map((t) => ({ value: t, label: t }));
+      })
+      .catch(() => {
+        this._tagOptions = [];
+      })
+      .finally(() => this._update());
   }
 }
 
