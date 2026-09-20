@@ -217,7 +217,7 @@ class CookCliRecipeViewStrategy extends HTMLElement {
     //if (recipe.image_url) content += `![image de la recette](${recipe.image_url})\n\n`;
     if (recipe.image_url) {
       const cleanImageUrl = recipe.image_url.replace(/([^:]\/)\/+/g, "\$1");
-      content += `<img src='${cleanImageUrl}' alt='image de la recette 2' style='width: 100%;aspect-ratio: 16 / 10;object-fit: cover;border-radius: 12px;margin-bottom: 8px;' />\n\n`;
+      content += `<img src='${cleanImageUrl}' alt='image de la recette' style='width: 100%;aspect-ratio: 16 / 10;object-fit: cover;border-radius: 12px;margin-bottom: 8px;' />\n\n`;
     }
     content += `## ${recipe.title || ""}\n`;
     if (recipe.cookware && recipe.cookware.length) {
