@@ -116,7 +116,7 @@ class CookCliDashboardStrategy extends HTMLElement {
 class CookCliRecipeViewStrategy extends HTMLElement {
   // Largeur unique de tous les boutons de navigation (Commencer, Précédent,
   // Suivant) : c'est elle qu'on ajuste pour les agrandir ou les réduire.
-  static NAV_BUTTON_WIDTH = "clamp(96px, 26vw, 130px)";
+  static NAV_BUTTON_WIDTH = "clamp(96px, 26vw, 150px)";
 
   static async generate(config, hass) {
     config = config || {};
@@ -252,7 +252,6 @@ class CookCliRecipeViewStrategy extends HTMLElement {
             left: 50%;
             transform: translateX(-50%);
             width: max-content;
-            /*max-width: calc(100vw - 32px);*/
             z-index: 5;
             padding: 8px;
             border-radius: 999px;
