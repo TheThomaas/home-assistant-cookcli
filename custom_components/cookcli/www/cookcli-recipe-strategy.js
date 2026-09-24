@@ -198,7 +198,14 @@ class CookCliRecipeViewStrategy extends HTMLElement {
     }
   }
 
-  static _navButton(entity, targetIndex, label, icon) {
+  static _navButton(entity, targetIndex, label, icon, style = null) {
+    let card_mod = {};
+    if (label == "Précédent") {
+      card_mod =  `style: :host { position:absolute; bottom:0; left:0; }`;
+    } else {
+      card_mod =  `style: :host { position:absolute; bottom:0; right:0; }`;
+    }
+    
     return {
       type: "button",
       name: label,
@@ -209,6 +216,7 @@ class CookCliRecipeViewStrategy extends HTMLElement {
         target: { entity_id: entity },
         data: { value: targetIndex },
       },
+      card_mod
     };
   }
 
@@ -221,7 +229,7 @@ class CookCliRecipeViewStrategy extends HTMLElement {
     }
     content += `## ${recipe.title || ""}\n`;
     if (recipe.cookware && recipe.cookware.length) {
-      content += `\n TEST \n**Ustensiles** : ${recipe.cookware.map((c) => c.name).join(", ")}\n`;
+      content += `\n**Ustensiles** : ${recipe.cookware.map((c) => c.name).join(", ")}\n`;
     }
 
     const cards = [{ 
