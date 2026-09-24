@@ -226,6 +226,43 @@ class CookCliRecipeViewStrategy extends HTMLElement {
     };
   }
 
+  /**
+   * Barre de navigation flottante en bas de l'écran. Les boutons ont une
+   * largeur fixe (et non flex: 1) : un seul bouton fait la même taille que
+   * deux, et la barre s'adapte à son contenu (max-content).
+   */
+  static _floatingNav(buttons) {
+    return {
+      type: "horizontal-stack",
+      cards: buttons,
+      card_mod: {
+        style: `
+          :host {
+            position: fixed;
+            bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+            left: 50%;
+            transform: translateX(-50%);
+            width: max-content;
+            max-width: calc(100vw - 32px);
+            z-index: 5;
+            padding: 8px;
+            border-radius: 999px;
+            background: color-mix(in srgb, var(--card-background-color) 80%, transparent);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+            height: auto !important;
+          }
+          #root {
+            justify-content: center;
+          }
+          #root > * {
+            flex: 0 0 clamp(110px, 38vw, 160px) !important;
+          }
+        `,
+      },
+    };
+  }
+
   static _summaryTab(recipe, config, stepCount) {
     let content = "";
     //if (recipe.image_url) content += `![image de la recette](${recipe.image_url})\n\n`;
@@ -272,12 +309,25 @@ class CookCliRecipeViewStrategy extends HTMLElement {
     }
 
     if (config.step_entity && stepCount > 0) {
-      rightCards.push(this._navButton(config.step_entity, 1, "Commencer", "mdi:play", true));
+      rightCards.push(
+        this._floatingNav([
+          this._navButton(config.step_entity, 1, "Commencer", "mdi:play", true),
+        ])
+      );
     }
 
     cards.push({ type: "vertical-stack", cards: rightCards });
 
-    const tab = { name: "Résumé", icon: "mdi:book-open-variant", card: { type: "horizontal-stack", cards } };
+    const tab = {
+      name: "Résumé",
+      icon: "mdi:book-open-variant",
+      card: {
+        type: "horizontal-stack",
+        cards,
+        // Réserve la place de la barre flottante sous la checklist.
+        card_mod: { style: ":host { display: block; padding-bottom: 96px; }" },
+      },
+    };
     if (config.step_entity) tab.auto_select = { entity: config.step_entity, state: "0.0" };
     return tab;
   }
@@ -341,29 +391,7 @@ class CookCliRecipeViewStrategy extends HTMLElement {
           this._navButton(config.step_entity, tabIndex + 1, "Suivant", "mdi:arrow-right", true)
         );
       }
-      cards.push({
-        type: "horizontal-stack",
-        cards: navButtons,
-        card_mod: {
-          style: `
-            :host {
-              position: fixed;
-              bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-              left: 50%;
-              transform: translateX(-50%);
-              width: min(420px, calc(100vw - 32px));
-              z-index: 5;
-              padding: 8px;
-              border-radius: 999px;
-              background: color-mix(in srgb, var(--card-background-color) 80%, transparent);
-              backdrop-filter: blur(10px);
-              box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-              
-              height: auto !important;
-            }
-          `,
-        },
-      });
+      cards.push(this._floatingNav(navButtons));
     }
 
     const tab = {
