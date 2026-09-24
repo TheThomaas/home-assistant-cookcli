@@ -645,6 +645,7 @@ class CookCliCardEditor extends HTMLElement {
  *   type: custom:cookcli-checklist-card
  *   storage_key: chocolat-chaud.cook:2
  *   items: [{ quantity: "200 ml", name: "lait" }, ...]
+ *   title: Ingrédients            # optionnel
  */
 class CookCliChecklistCard extends HTMLElement {
   setConfig(config) {
@@ -739,6 +740,13 @@ class CookCliChecklistCard extends HTMLElement {
     this.shadowRoot.innerHTML = `
       <style>
         ha-card { padding: 8px 16px; }
+        .title {
+          padding: 8px 0 4px;
+          font-size: var(--ha-card-header-font-size, 24px);
+          font-weight: var(--ha-card-header-font-weight, 400);
+          line-height: 32px;
+          color: var(--ha-card-header-color, var(--primary-text-color));
+        }
         .row {
           display: flex;
           align-items: center;
@@ -771,6 +779,7 @@ class CookCliChecklistCard extends HTMLElement {
         }
       </style>
       <ha-card>
+        ${this._config.title ? `<div class="title">${this._escape(this._config.title)}</div>` : ""}
         ${rows}
         <button class="reset" data-reset>Tout décocher</button>
       </ha-card>
