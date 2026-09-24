@@ -230,6 +230,18 @@ class CookCliRecipeViewStrategy extends HTMLElement {
                 --paper-item-icon-color: var(--text-primary-color, #fff);`
               : `background: var(--secondary-background-color);`}
           }
+          @media (max-width: 869px) {
+              ha-card > span {
+                border: 0 !important;
+                clip-path: inset(50%) !important;
+                height: 1px !important;
+                margin: -1px !important;
+                overflow: hidden !important;
+                padding: 0 !important;
+                width: 1px !important;
+                white-space: nowrap !important;
+              }
+          }
         `,
       },
     };
