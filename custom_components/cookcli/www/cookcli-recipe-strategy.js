@@ -204,8 +204,8 @@ class CookCliRecipeViewStrategy extends HTMLElement {
       name: label,
       icon,
       tap_action: {
-        action: "call-service",
-        service: "input_number.set_value",
+        action: "perform-action",
+        perform_action: "input_number.set_value",
         target: { entity_id: entity },
         data: { value: targetIndex },
       },
@@ -221,7 +221,7 @@ class CookCliRecipeViewStrategy extends HTMLElement {
     }
     content += `## ${recipe.title || ""}\n`;
     if (recipe.cookware && recipe.cookware.length) {
-      content += `\n**Ustensiles** : ${recipe.cookware.map((c) => c.name).join(", ")}\n`;
+      content += `\n TEST \n**Ustensiles** : ${recipe.cookware.map((c) => c.name).join(", ")}\n`;
     }
 
     const cards = [{ 
@@ -263,7 +263,9 @@ class CookCliRecipeViewStrategy extends HTMLElement {
 
     cards.push({ type: "vertical-stack", cards: rightCards });
 
-    return { name: "Résumé", icon: "mdi:book-open-variant", card: { type: "horizontal-stack", cards } };
+    const tab = { name: "Résumé", icon: "mdi:book-open-variant", card: { type: "horizontal-stack", cards } };
+    if (config.step_entity) tab.auto_select = { entity: config.step_entity, state: "0.0" };
+    return tab;
   }
 
   static _stepTab(section, step, tabIndex, isLast, config) {
@@ -291,8 +293,8 @@ class CookCliRecipeViewStrategy extends HTMLElement {
           name: `Démarrer ${label}`,
           icon: "mdi:timer-outline",
           tap_action: {
-            action: "call-service",
-            service: "timer.start",
+            action: "perform-action",
+            perform_action: "timer.start",
             target: { entity_id: config.timer_entity },
             data: { duration: this._secondsToHms(seconds) },
           },
@@ -328,10 +330,12 @@ class CookCliRecipeViewStrategy extends HTMLElement {
       cards.push({ type: "horizontal-stack", cards: navButtons });
     }
 
-    return {
+    const tab = {
       name: section.name ? `${section.name} ${step.number ?? ""}`.trim() : `Étape ${tabIndex}`,
       card: { type: "vertical-stack", cards },
     };
+    if (config.step_entity) tab.auto_select = { entity: config.step_entity, state: `${tabIndex}.0` };
+    return tab;
   }
 
   static _renderStepMarkdown(step) {
