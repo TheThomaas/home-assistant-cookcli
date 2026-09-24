@@ -463,10 +463,13 @@ class CookCliRecipeViewStrategy extends HTMLElement {
         );
       } else {
         navButtons.push({
+          type: "heading"
+        });
+        /*navButtons.push({
           type: "markdown",
           content: " ",
           text_only: true
-        });
+        });*/
       }
       cards.push(this._floatingNav(navButtons));
     }
