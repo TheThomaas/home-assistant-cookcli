@@ -264,6 +264,45 @@ class CookCliRecipeViewStrategy extends HTMLElement {
     };
   }
 
+  /**
+   * Deux colonnes sur grand écran (gauche étroite, droite large), une seule
+   * colonne empilée sur mobile. Un horizontal-stack natif ne sait faire ni l'un
+   * ni l'autre : on surcharge son conteneur interne (#root) avec card-mod.
+   * 870px = le seuil "mobile" de Home Assistant.
+   */
+  static _responsiveColumns(leftCard, rightCard, leftWidth = "30%") {
+    return {
+      type: "horizontal-stack",
+      cards: [leftCard, rightCard],
+      card_mod: {
+        style: `
+          #root {
+            flex-direction: column !important;
+          }
+          #root > * {
+            flex: 0 0 auto !important;
+            width: 100% !important;
+            min-width: 0;
+          }
+          @media (min-width: 870px) {
+            #root {
+              flex-direction: row !important;
+              align-items: flex-start;
+            }
+            #root > :first-child {
+              flex: 0 0 ${leftWidth} !important;
+              width: auto !important;
+            }
+            #root > :last-child {
+              flex: 1 1 0 !important;
+              width: auto !important;
+            }
+          }
+        `,
+      },
+    };
+  }
+
   static _summaryTab(recipe, config, stepCount) {
     let content = "";
     //if (recipe.image_url) content += `![image de la recette](${recipe.image_url})\n\n`;
@@ -373,13 +412,10 @@ class CookCliRecipeViewStrategy extends HTMLElement {
       leftCards.push({ type: "markdown", content: " " });
     }
 
-    const columns = {
-      type: "horizontal-stack",
-      cards: [
-        { type: "vertical-stack", cards: leftCards },
-        { type: "markdown", content: stepMarkdown },
-      ],
-    };
+    const columns = this._responsiveColumns(
+      { type: "vertical-stack", cards: leftCards },
+      { type: "markdown", content: stepMarkdown }
+    );
 
     const cards = [columns];
 
