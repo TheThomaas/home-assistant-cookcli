@@ -198,12 +198,7 @@ class CookCliRecipeViewStrategy extends HTMLElement {
     }
   }
 
-  static _navButton(entity, targetIndex, label, icon, style = null) {
-    let card_mod = { card_mod: `style: :host { position:absolute; bottom:0; right:0; }` };
-    if (label == "Précédent") {
-      card_mod =  { card_mod: `style: :host { position:absolute; bottom:0; left:0; }` };
-    }
-    
+  static _navButton(entity, targetIndex, label, icon, accent = false) {
     return {
       type: "button",
       name: label,
@@ -214,7 +209,20 @@ class CookCliRecipeViewStrategy extends HTMLElement {
         target: { entity_id: entity },
         data: { value: targetIndex },
       },
-      ...card_mod
+      card_mod: {
+        style: `
+          ha-card {
+            border-radius: 999px;
+            --ha-card-border-width: 0;
+            box-shadow: none;
+            ${accent
+              ? `background: var(--primary-color);
+                --primary-text-color: var(--text-primary-color, #fff);
+                --paper-item-icon-color: var(--text-primary-color, #fff);`
+              : `background: var(--secondary-background-color);`}
+          }
+        `,
+      },
     };
   }
 
@@ -264,7 +272,7 @@ class CookCliRecipeViewStrategy extends HTMLElement {
     }
 
     if (config.step_entity && stepCount > 0) {
-      rightCards.push(this._navButton(config.step_entity, 1, "Commencer", "mdi:play"));
+      rightCards.push(this._navButton(config.step_entity, 1, "Commencer", "mdi:play", true));
     }
 
     cards.push({ type: "vertical-stack", cards: rightCards });
@@ -330,15 +338,39 @@ class CookCliRecipeViewStrategy extends HTMLElement {
       ];
       if (!isLast) {
         navButtons.push(
-          this._navButton(config.step_entity, tabIndex + 1, "Suivant", "mdi:arrow-right")
+          this._navButton(config.step_entity, tabIndex + 1, "Suivant", "mdi:arrow-right", true)
         );
       }
-      cards.push({ type: "horizontal-stack", cards: navButtons });
+      cards.push({
+        type: "horizontal-stack",
+        cards: navButtons,
+        card_mod: {
+          style: `
+            :host {
+              position: fixed;
+              bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+              left: 50%;
+              transform: translateX(-50%);
+              width: min(420px, calc(100vw - 32px));
+              z-index: 5;
+              padding: 8px;
+              border-radius: 999px;
+              background: color-mix(in srgb, var(--card-background-color) 80%, transparent);
+              backdrop-filter: blur(10px);
+              box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+            }
+          `,
+        },
+      });
     }
 
     const tab = {
       name: section.name ? `${section.name} ${step.number ?? ""}`.trim() : `Étape ${tabIndex}`,
-      card: { type: "vertical-stack", cards },
+      card: {
+        type: "vertical-stack",
+        cards,
+        card_mod: { style: ":host { display: block; padding-bottom: 96px; }" },
+      },
     };
     if (config.step_entity) tab.auto_select = { entity: config.step_entity, state: `${tabIndex}.0` };
     return tab;
