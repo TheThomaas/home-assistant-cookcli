@@ -34,7 +34,7 @@
  * Cartes utilisées, toutes tierces ou natives — aucune carte custom pour le
  * rendu du contenu lui-même :
  * - markdown (native)           : titre, image, ustensiles, texte des étapes
- * - todo-list (native)          : checklist des ingrédients (todo.py backend)
+ * - custom:cookcli-checklist-card : checklist des ingrédients (Résumé et étapes), état local
  * - button (native)             : Commencer / Précédent / Suivant / Démarrer minuteur
  * - custom:circular-timer-card  : affichage/contrôle du minuteur partagé
  * - custom:tabdeck-card         : les onglets (Résumé + une par étape)
@@ -339,18 +339,21 @@ class CookCliRecipeViewStrategy extends HTMLElement {
 
     const rightCards = [];
 
-    if (recipe.todo_entity_id) {
+    const ingredients = recipe.ingredients || [];
+    if (ingredients.length) {
       rightCards.push({
-        type: "todo-list",
-        entity: recipe.todo_entity_id,
-        title: "Ingrédients",
-        card_mod: {
-          style: `
-              ha-list .header {
-                display: none;
-              }
-            `
-        }
+        type: "custom:cookcli-checklist-card",
+        // État coché propre à cette recette, indépendant de celui des étapes.
+        storage_key: `${config.path}:summary`,
+        items: ingredients.map((ingredient) => {
+          const quantity = ingredient.quantity || {};
+          return {
+            quantity: [quantity.value, quantity.unit]
+              .filter((part) => part !== null && part !== undefined && part !== "")
+              .join(" "),
+            name: ingredient.name ?? "",
+          };
+        }),
       });
     }
 
