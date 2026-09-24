@@ -199,11 +199,9 @@ class CookCliRecipeViewStrategy extends HTMLElement {
   }
 
   static _navButton(entity, targetIndex, label, icon, style = null) {
-    let card_mod = {};
+    let card_mod = { card_mod: `style: :host { position:absolute; bottom:0; right:0; }` };
     if (label == "Précédent") {
-      card_mod =  `style: :host { position:absolute; bottom:0; left:0; }`;
-    } else {
-      card_mod =  `style: :host { position:absolute; bottom:0; right:0; }`;
+      card_mod =  { card_mod: `style: :host { position:absolute; bottom:0; left:0; }` };
     }
     
     return {
@@ -216,7 +214,7 @@ class CookCliRecipeViewStrategy extends HTMLElement {
         target: { entity_id: entity },
         data: { value: targetIndex },
       },
-      card_mod
+      ...card_mod
     };
   }
 
