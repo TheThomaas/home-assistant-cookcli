@@ -361,7 +361,7 @@ class CookCliRecipeViewStrategy extends HTMLElement {
     const columns = this._responsiveColumns(
       leftCard,
       { type: "vertical-stack", cards: rightCards },
-      "40%"
+      "30%"
     );
 
     const tab = {
