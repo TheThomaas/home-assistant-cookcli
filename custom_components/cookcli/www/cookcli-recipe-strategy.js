@@ -243,7 +243,7 @@ class CookCliRecipeViewStrategy extends HTMLElement {
             left: 50%;
             transform: translateX(-50%);
             width: max-content;
-            max-width: calc(100vw - 32px);
+            /* max-width: calc(100vw - 32px); */
             max-width: calc(20vw);
             z-index: 5;
             padding: 8px;
@@ -317,21 +317,21 @@ class CookCliRecipeViewStrategy extends HTMLElement {
       content += `\n**Ustensiles** : ${recipe.cookware.map((c) => c.name).join(", ")}\n`;
     }
 
-    const cards = [{ 
-      type: "markdown", 
+    const leftCard = {
+      type: "markdown",
       content,
-      card_mod:`
+      card_mod: `
         style:
           ha-markdown:
             $: |
-              img { 
+              img {
                 width: 100%;
                 aspect-ratio: 16 / 10;
                 object-fit: cover;
                 border-radius: 12px;
                 margin-bottom: 8px;
-              }`
-    }];
+              }`,
+    };
 
     const rightCards = [];
 
@@ -358,14 +358,18 @@ class CookCliRecipeViewStrategy extends HTMLElement {
       );
     }
 
-    cards.push({ type: "vertical-stack", cards: rightCards });
+    const columns = this._responsiveColumns(
+      leftCard,
+      { type: "vertical-stack", cards: rightCards },
+      "40%"
+    );
 
     const tab = {
       name: "Résumé",
       icon: "mdi:book-open-variant",
       card: {
-        type: "horizontal-stack",
-        cards,
+        type: "vertical-stack",
+        cards: [columns],
         // Réserve la place de la barre flottante sous la checklist.
         card_mod: { style: ":host { display: block; padding-bottom: 96px; }" },
       },
