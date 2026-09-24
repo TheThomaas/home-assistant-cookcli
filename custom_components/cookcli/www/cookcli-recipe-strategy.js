@@ -461,6 +461,11 @@ class CookCliRecipeViewStrategy extends HTMLElement {
         navButtons.push(
           this._navButton(config.step_entity, tabIndex + 1, "Suivant", "mdi:arrow-right", true)
         );
+      } else {
+        navButtons.push({
+          type: "markdown",
+          content: " "
+        });
       }
       cards.push(this._floatingNav(navButtons));
     }
