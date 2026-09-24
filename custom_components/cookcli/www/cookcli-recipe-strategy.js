@@ -114,6 +114,10 @@ class CookCliDashboardStrategy extends HTMLElement {
  * d'une unique carte tabdeck-card (Résumé + une tab par étape).
  */
 class CookCliRecipeViewStrategy extends HTMLElement {
+  // Largeur unique de tous les boutons de navigation (Commencer, Précédent,
+  // Suivant) : c'est elle qu'on ajuste pour les agrandir ou les réduire.
+  static NAV_BUTTON_WIDTH = "clamp(96px, 26vw, 130px)";
+
   static async generate(config, hass) {
     config = config || {};
     const path = config.path;
@@ -211,6 +215,11 @@ class CookCliRecipeViewStrategy extends HTMLElement {
       },
       card_mod: {
         style: `
+          :host {
+            flex: 0 0 ${this.NAV_BUTTON_WIDTH} !important;
+            width: ${this.NAV_BUTTON_WIDTH} !important;
+            min-width: 0 !important;
+          }
           ha-card {
             border-radius: 999px;
             --ha-card-border-width: 0;
@@ -243,8 +252,7 @@ class CookCliRecipeViewStrategy extends HTMLElement {
             left: 50%;
             transform: translateX(-50%);
             width: max-content;
-            /* max-width: calc(100vw - 32px); */
-            max-width: calc(20vw);
+            /*max-width: calc(100vw - 32px);*/
             z-index: 5;
             padding: 8px;
             border-radius: 999px;
@@ -255,9 +263,6 @@ class CookCliRecipeViewStrategy extends HTMLElement {
           }
           #root {
             justify-content: center;
-          }
-          #root > * {
-            flex: 0 0 clamp(110px, 38vw, 160px) !important;
           }
         `,
       },
