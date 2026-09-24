@@ -388,13 +388,17 @@ class CookCliRecipeViewStrategy extends HTMLElement {
     const leftCards = [];
     const stepIngredients = (step.items || []).filter((item) => item.type === "ingredient");
     if (stepIngredients.length) {
-      const lines = stepIngredients.map((item) => {
-        const qty = item.quantity ?? ""
-          ? `${item.quantity.value ?? ""} ${item.quantity.unit ?? ""}`.trim()
-          : "";
-        return `- ${qty ? `**${qty}** ` : ""}${item.name ?? ""}`;
+      leftCards.push({
+        type: "custom:cookcli-checklist-card",
+        // recette + étape : l'état coché est propre à chaque étape de chaque recette
+        storage_key: `${config.path}:${tabIndex}`,
+        items: stepIngredients.map((item) => ({
+          quantity: item.quantity
+            ? `${item.quantity.value ?? ""} ${item.quantity.unit ?? ""}`.trim()
+            : "",
+          name: item.name ?? "",
+        })),
       });
-      leftCards.push({ type: "markdown", content: lines.join("\n") });
     }
 
     if (config.timer_entity) {

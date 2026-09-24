@@ -636,8 +636,151 @@ class CookCliCardEditor extends HTMLElement {
   }
 }
 
+/**
+ * Checklist d'ingrédients d'une étape (cases à cocher, état local).
+ *
+ * L'état coché est stocké dans localStorage du navigateur, par recette et par
+ * étape (`storage_key`) : il n'est pas partagé entre appareils, ni lié à la
+ * todo du Résumé. Config :
+ *   type: custom:cookcli-checklist-card
+ *   storage_key: chocolat-chaud.cook:2
+ *   items: [{ quantity: "200 ml", name: "lait" }, ...]
+ */
+class CookCliChecklistCard extends HTMLElement {
+  setConfig(config) {
+    if (!config || !Array.isArray(config.items)) {
+      throw new Error("La carte a besoin d'une liste `items`.");
+    }
+    this._config = config;
+    this._checked = this._load();
+
+    if (!this.shadowRoot) {
+      this.attachShadow({ mode: "open" });
+      this.shadowRoot.addEventListener("change", (ev) => this._onChange(ev));
+      this.shadowRoot.addEventListener("click", (ev) => this._onClick(ev));
+    }
+    this._render();
+  }
+
+  getCardSize() {
+    return (this._config?.items?.length || 0) + 1;
+  }
+
+  _storageKey() {
+    return `cookcli-checklist:${this._config.storage_key || "default"}`;
+  }
+
+  // Identifiant d'une ligne : index + libellé, pour rester correct si deux
+  // lignes ont le même nom ou si la recette est modifiée.
+  _itemId(item, index) {
+    return `${index}:${item.quantity || ""} ${item.name || ""}`.trim();
+  }
+
+  _load() {
+    try {
+      const raw = localStorage.getItem(this._storageKey());
+      const parsed = raw ? JSON.parse(raw) : [];
+      return new Set(Array.isArray(parsed) ? parsed : []);
+    } catch (err) {
+      return new Set();
+    }
+  }
+
+  _save() {
+    try {
+      localStorage.setItem(this._storageKey(), JSON.stringify([...this._checked]));
+    } catch (err) {
+      // localStorage indisponible : l'état reste valable jusqu'au prochain rendu.
+    }
+  }
+
+  _onChange(ev) {
+    const input = ev.target.closest("input[data-id]");
+    if (!input) return;
+    if (input.checked) this._checked.add(input.dataset.id);
+    else this._checked.delete(input.dataset.id);
+    this._save();
+    this._render();
+  }
+
+  _onClick(ev) {
+    if (ev.target.closest("[data-reset]")) {
+      this._checked.clear();
+      this._save();
+      this._render();
+    }
+  }
+
+  _escape(str) {
+    const div = document.createElement("div");
+    div.textContent = str ?? "";
+    return div.innerHTML;
+  }
+
+  _render() {
+    if (!this.shadowRoot) return;
+    const items = this._config.items;
+    const anyChecked = items.some((item, i) => this._checked.has(this._itemId(item, i)));
+
+    const rows = items
+      .map((item, i) => {
+        const id = this._itemId(item, i);
+        const checked = this._checked.has(id);
+        return `
+          <label class="row ${checked ? "done" : ""}">
+            <input type="checkbox" data-id="${this._escape(id)}" ${checked ? "checked" : ""}>
+            <span class="label">
+              ${item.quantity ? `<strong>${this._escape(item.quantity)}</strong> ` : ""}${this._escape(item.name)}
+            </span>
+          </label>`;
+      })
+      .join("");
+
+    this.shadowRoot.innerHTML = `
+      <style>
+        ha-card { padding: 8px 16px; }
+        .row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 8px 0;
+          cursor: pointer;
+          color: var(--primary-text-color);
+        }
+        .row input {
+          width: 20px;
+          height: 20px;
+          flex-shrink: 0;
+          accent-color: var(--primary-color);
+          cursor: pointer;
+        }
+        .row.done .label {
+          text-decoration: line-through;
+          color: var(--secondary-text-color);
+        }
+        .reset {
+          display: ${anyChecked ? "block" : "none"};
+          margin-left: auto;
+          padding: 4px 0 0;
+          background: none;
+          border: none;
+          font: inherit;
+          font-size: 0.85em;
+          color: var(--primary-color);
+          cursor: pointer;
+        }
+      </style>
+      <ha-card>
+        ${rows}
+        <button class="reset" data-reset>Tout décocher</button>
+      </ha-card>
+    `;
+  }
+}
+
 customElements.define("cookcli-card", CookCliCard);
 customElements.define("cookcli-card-editor", CookCliCardEditor);
+customElements.define("cookcli-checklist-card", CookCliChecklistCard);
 
 window.customCards = window.customCards || [];
 window.customCards.push({
