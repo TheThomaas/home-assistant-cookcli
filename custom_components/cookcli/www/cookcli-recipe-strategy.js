@@ -343,6 +343,7 @@ class CookCliRecipeViewStrategy extends HTMLElement {
     if (ingredients.length) {
       rightCards.push({
         type: "custom:cookcli-checklist-card",
+        title: "Ingrédients",
         // État coché propre à cette recette, indépendant de celui des étapes.
         storage_key: `${config.path}:summary`,
         items: ingredients.map((ingredient) => {
@@ -393,6 +394,7 @@ class CookCliRecipeViewStrategy extends HTMLElement {
     if (stepIngredients.length) {
       leftCards.push({
         type: "custom:cookcli-checklist-card",
+        title: "Ingrédients",
         // recette + étape : l'état coché est propre à chaque étape de chaque recette
         storage_key: `${config.path}:${tabIndex}`,
         items: stepIngredients.map((item) => ({
