@@ -290,10 +290,12 @@ class CookCliRecipeViewStrategy extends HTMLElement {
               align-items: flex-start;
             }
             #root > :first-child {
+              display: flex;
               flex: 0 0 ${leftWidth} !important;
               width: auto !important;
             }
             #root > :last-child {
+              display: flex;
               flex: 1 1 0 !important;
               width: auto !important;
             }
