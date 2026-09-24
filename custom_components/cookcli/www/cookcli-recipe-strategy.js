@@ -464,7 +464,8 @@ class CookCliRecipeViewStrategy extends HTMLElement {
       } else {
         navButtons.push({
           type: "markdown",
-          content: " "
+          content: " ",
+          text_only: true
         });
       }
       cards.push(this._floatingNav(navButtons));
