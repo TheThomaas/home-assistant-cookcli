@@ -249,7 +249,7 @@ class CookCliRecipeViewStrategy extends HTMLElement {
           :host {
             position: fixed;
             bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-            left: 50%;
+            right: calc(16px + env(safe-area-inset-bottom, 0px));
             transform: translateX(-50%);
             width: max-content;
             z-index: 5;
