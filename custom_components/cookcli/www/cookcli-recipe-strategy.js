@@ -217,7 +217,7 @@ class CookCliRecipeViewStrategy extends HTMLElement {
             box-shadow: none;
             ${accent
               ? `background: var(--primary-color);
-                --primary-text-color: var(--text-primary-color, #fff);
+                --state-color: var(--text-primary-color, #fff);
                 --paper-item-icon-color: var(--text-primary-color, #fff);`
               : `background: var(--secondary-background-color);`}
           }
@@ -358,6 +358,8 @@ class CookCliRecipeViewStrategy extends HTMLElement {
               background: color-mix(in srgb, var(--card-background-color) 80%, transparent);
               backdrop-filter: blur(10px);
               box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+              
+              height: auto !important;
             }
           `,
         },
