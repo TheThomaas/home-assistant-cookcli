@@ -217,7 +217,7 @@ class CookCliRecipeViewStrategy extends HTMLElement {
             box-shadow: none;
             ${accent
               ? `background: var(--primary-color);
-                --state-color: var(--text-primary-color, #fff);
+                --state-color: var(--text-primary-color, #fff) !important;
                 --paper-item-icon-color: var(--text-primary-color, #fff);`
               : `background: var(--secondary-background-color);`}
           }
