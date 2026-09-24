@@ -117,6 +117,7 @@ class CookCliRecipeViewStrategy extends HTMLElement {
   // Largeur unique de tous les boutons de navigation (Commencer, Précédent,
   // Suivant) : c'est elle qu'on ajuste pour les agrandir ou les réduire.
   static NAV_BUTTON_WIDTH = "clamp(96px, 26vw, 150px)";
+  static NAV_BUTTON_WIDTH_MOBILE = "clamp(46px, 20vw, 100px)";
 
   static async generate(config, hass) {
     config = config || {};
@@ -231,16 +232,21 @@ class CookCliRecipeViewStrategy extends HTMLElement {
               : `background: var(--secondary-background-color);`}
           }
           @media (max-width: 869px) {
-              ha-card > span {
-                border: 0 !important;
-                clip-path: inset(50%) !important;
-                height: 1px !important;
-                margin: -1px !important;
-                overflow: hidden !important;
-                padding: 0 !important;
-                width: 1px !important;
-                white-space: nowrap !important;
-              }
+            :host {
+              flex: 0 0 ${this.NAV_BUTTON_WIDTH_MOBILE} !important;
+              width: ${this.NAV_BUTTON_WIDTH_MOBILE} !important;
+              height: ${this.NAV_BUTTON_WIDTH_MOBILE} !important;
+            }
+            ha-card > span {
+              border: 0 !important;
+              clip-path: inset(50%) !important;
+              height: 1px !important;
+              margin: -1px !important;
+              overflow: hidden !important;
+              padding: 0 !important;
+              width: 1px !important;
+              white-space: nowrap !important;
+            }
           }
         `,
       },
