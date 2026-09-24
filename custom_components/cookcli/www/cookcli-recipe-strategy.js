@@ -268,8 +268,6 @@ class CookCliRecipeViewStrategy extends HTMLElement {
             position: fixed;
             bottom: calc(16px + env(safe-area-inset-bottom, 0px));
             right: calc(16px + env(safe-area-inset-bottom, 0px));
-            bottom: 16px;
-            right: 16px;
             width: max-content;
             z-index: 5;
             padding: 8px;
@@ -281,6 +279,11 @@ class CookCliRecipeViewStrategy extends HTMLElement {
           }
           #root {
             justify-content: center;
+          }
+          @media (max-width: 869px) {
+            :host {
+              right: 0;
+            }
           }
         `,
       },
