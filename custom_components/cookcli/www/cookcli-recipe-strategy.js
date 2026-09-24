@@ -244,6 +244,7 @@ class CookCliRecipeViewStrategy extends HTMLElement {
             transform: translateX(-50%);
             width: max-content;
             max-width: calc(100vw - 32px);
+            max-width: calc(25vw);
             z-index: 5;
             padding: 8px;
             border-radius: 999px;
