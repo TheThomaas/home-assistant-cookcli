@@ -476,7 +476,7 @@ class CookCliRecipeViewStrategy extends HTMLElement {
         leftCards.push({ type: "custom:circular-timer-card", entity: config.timer_entity });
         rightCards.push({
           type: "grid",
-          columns: Math.min(2, buttons.length),
+          columns: Math.min(3, buttons.length + 2),
           square: false,
           cards: buttons,
         });
