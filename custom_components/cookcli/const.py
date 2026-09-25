@@ -15,5 +15,3 @@ HASSIO_DISCOVERY_SLUG = "cookcli"
 # Les fichiers .cook ne changent qu'après un sync git côté add-on,
 # donc pas besoin de poller souvent.
 UPDATE_INTERVAL_MINUTES = 15
-
-# PLATFORMS: list[str] = ["todo"]

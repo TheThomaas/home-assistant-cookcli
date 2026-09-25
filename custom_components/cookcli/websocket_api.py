@@ -12,11 +12,6 @@ un <img src="...">, qui pointe vers CookCliImageView (voir image_proxy.py) —
 le frontend n'a pas besoin de connaître le format brut des chemins d'image
 renvoyés par CookCLI.
 
-cookcli/recipe repeuple aussi l'entité todo d'ingrédients (todo.py) avec les
-ingrédients de la recette ouverte, et renvoie son entity_id dans
-"todo_entity_id" pour que le frontend puisse l'afficher avec la carte
-native `todo-list`.
-
 cookcli/recipes inclut "view_path" par recette : le slug utilisé comme path
 de vue HA, calculé une seule fois ici (voir _view_path) pour que
 cookcli-card.js et la dashboard strategy (cookcli-recipe-strategy.js)
@@ -142,11 +137,6 @@ async def ws_get_recipe(
         return
 
     recipe["image_url"] = _image_url(hass, entry_id, recipe.get("image"))
-
-    # todo_entity = entry_data.get("todo_entity")
-    # if todo_entity is not None:
-    #     todo_entity.set_ingredients(_ingredient_summaries(recipe.get("ingredients", [])))
-    #     recipe["todo_entity_id"] = todo_entity.entity_id
 
     connection.send_result(msg["id"], recipe)
 
