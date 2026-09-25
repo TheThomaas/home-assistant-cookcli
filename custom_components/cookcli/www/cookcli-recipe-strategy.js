@@ -403,6 +403,9 @@ class CookCliRecipeViewStrategy extends HTMLElement {
 
   static _stepTab(section, step, tabIndex, isLast, config) {
     const { markdown: stepMarkdown, timers } = this._renderStepMarkdown(step);
+    const stepLabel = section.name
+      ? `${section.name} ${step.number ?? ""}`.trim()
+      : `Étape ${tabIndex}`;
 
     const leftCards = [];
     const stepIngredients = (step.items || []).filter((item) => item.type === "ingredient");
@@ -448,7 +451,7 @@ class CookCliRecipeViewStrategy extends HTMLElement {
 
     const columns = this._responsiveColumns(
       { type: "vertical-stack", cards: leftCards },
-      { type: "markdown", content: stepMarkdown }
+      { type: "markdown", content: `## ${stepLabel}\n\n${stepMarkdown}` }
     );
 
     const cards = [columns];
@@ -481,7 +484,7 @@ class CookCliRecipeViewStrategy extends HTMLElement {
     }
 
     const tab = {
-      name: section.name ? `${section.name} ${step.number ?? ""}`.trim() : `Étape ${tabIndex}`,
+      name: stepLabel,
       card: {
         type: "vertical-stack",
         cards,
