@@ -433,6 +433,10 @@ class CookCliRecipeViewStrategy extends HTMLElement {
       : `Étape ${tabIndex}`;
 
     const leftCards = [];
+    const rightCards = [];
+
+    rightCards.push({ type: "markdown", content: `## ${stepLabel}\n\n${stepMarkdown}` })
+
     const stepIngredients = (step.items || []).filter((item) => item.type === "ingredient");
     if (stepIngredients.length) {
       leftCards.push({
@@ -470,7 +474,7 @@ class CookCliRecipeViewStrategy extends HTMLElement {
 
       if (buttons.length) {
         leftCards.push({ type: "custom:circular-timer-card", entity: config.timer_entity });
-        leftCards.push({
+        rightCards.push({
           type: "grid",
           columns: Math.min(2, buttons.length),
           square: false,
@@ -480,12 +484,12 @@ class CookCliRecipeViewStrategy extends HTMLElement {
     }
 
     if (!leftCards.length) {
-      leftCards.push({ type: "markdown", content: " " });
+      leftCards.push({ type: "markdown", content: " ", text_only: true });
     }
 
     const columns = this._responsiveColumns(
       { type: "vertical-stack", cards: leftCards },
-      { type: "markdown", content: `## ${stepLabel}\n\n${stepMarkdown}` }
+      { type: "vertical-stack", cards: rightCards },
     );
 
     const cards = [columns];
