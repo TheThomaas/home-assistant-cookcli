@@ -245,6 +245,31 @@ class CookCliRecipeViewStrategy extends HTMLElement {
       },
     };
   }
+  
+  /**
+   * Occupe exactement la même place qu'un bouton de navigation, en invisible
+   * et non cliquable : sert à garder "Précédent" à la même position sur la
+   * dernière étape que sur les autres, où il partage la barre avec "Suivant".
+   */
+  static _navSpacer() {
+    return {
+      type: "button",
+      show_name: false,
+      show_icon: false,
+      card_mod: {
+        style: `
+          :host {
+            flex: 0 0 ${this.NAV_BUTTON_WIDTH} !important;
+            width: ${this.NAV_BUTTON_WIDTH} !important;
+            height: ${this.NAV_BUTTON_WIDTH} !important;
+            min-width: 0 !important;
+            visibility: hidden;
+            pointer-events: none;
+          }
+        `,
+      },
+    };
+  }
 
   /**
    * Barre de navigation flottante en bas de l'écran. Les boutons ont une
@@ -465,20 +490,7 @@ class CookCliRecipeViewStrategy extends HTMLElement {
           this._navButton(config.step_entity, tabIndex + 1, "Suivant", "mdi:arrow-right", true)
         );
       } else {
-        navButtons.push({
-          type: "heading",
-          card_mod: {
-            style: `
-            ha-card {
-              width: ${this.NAV_BUTTON_WIDTH} !important;
-            }`
-          }
-        });
-        /*navButtons.push({
-          type: "markdown",
-          content: " ",
-          text_only: true
-        });*/
+        navButtons.push(this._navSpacer());
       }
       cards.push(this._floatingNav(navButtons));
     }
