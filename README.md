@@ -11,16 +11,6 @@ Cette intégration fonctionne main dans la main avec une **stratégie de tableau
 - 🥕 **Vue détaillée** de chaque recette : ingrédients et étapes de préparation
 - 🧭 **Carte de navigation** : liste toutes les recettes et permet de naviguer vers la page de détail
 
-## 🧩 Architecture
-
-Le projet est composé de **trois dépôts** qui travaillent ensemble :
-
-| Composant | Rôle | Dépôt |
-|---|---|---|
-| **Intégration** | Se connecte au serveur CookCLI et expose les recettes à Home Assistant | [ha-cookcli](https://git.thethomaas.net/TheThomaas/ha-cookcli) |
-| **Stratégie de tableau de bord** | Crée automatiquement une page par recette (ingrédients + étapes) | [ha-cookcli-strategy](https://git.thethomaas.net/TheThomaas/ha-cookcli-strategy) |
-| **Carte personnalisée** | Liste toutes les recettes et permet de naviguer vers le détail d'une recette | [ha-cookcli-card](https://git.thethomaas.net/TheThomaas/ha-cookcli-card) |
-
 ## 📦 Installation
 
 ### Prérequis
@@ -47,13 +37,6 @@ Le projet est composé de **trois dépôts** qui travaillent ensemble :
 2. Copiez le dossier `custom_components/cookcli` dans le répertoire `config/custom_components/` de votre instance Home Assistant.
 3. **Redémarrez Home Assistant.**
 
-### Installation de la carte et de la stratégie
-
-Répétez l'opération via HACS (catégorie **Lovelace** / **Dashboard**) pour :
-
-- [ha-cookcli-card](https://git.thethomaas.net/TheThomaas/ha-cookcli-card) — la carte
-- [ha-cookcli-strategy](https://git.thethomaas.net/TheThomaas/ha-cookcli-strategy) — la stratégie de tableau de bord
-
 ## ⚙️ Configuration
 
 1. Dans Home Assistant, allez dans **Paramètres** → **Appareils et services**.
@@ -70,6 +53,14 @@ Répétez l'opération via HACS (catégorie **Lovelace** / **Dashboard**) pour :
 
 Ajoutez la carte `cookcli-card` à un tableau de bord pour afficher la liste de toutes vos recettes. Cliquer sur une recette vous amène vers sa page de détail.
 
+Options disponibles :
+
+- **title** : Titre de la carte. Par défaut : « Recettes ».
+- **tag** : N'afficher que les recettes portant ce tag. Vide = toutes les recettes.
+- **show_tag_filter** : Affiche des pills cliquables en haut de la liste pour filtrer par tag.
+- **dashboard_path** : Seulement si la carte n'est pas sur le dashboard qui contient les vues recettes.
+- **entry_id** : Seulement si tu as plusieurs serveurs CookCLI. Vide = le serveur par défaut.
+
 Exemple (YAML) :
 
 ```yaml
@@ -77,14 +68,19 @@ type: custom:cookcli-card
 title: Mes recettes
 ```
 
-> Adaptez la configuration selon les options exposées par la carte. Consultez le [README de ha-cookcli-card](https://git.thethomaas.net/TheThomaas/ha-cookcli-card) pour la liste complète des options.
-
 ### Stratégie de tableau de bord
 
 La stratégie `cookcli-recipe-strategy` génère automatiquement un tableau de bord avec **une page par recette**. Chaque page affiche :
 
 - la liste des **ingrédients**,
 - les **étapes** de préparation.
+
+Options disponibles :
+
+- **title** : Titre de la liste et du dashboard. Par défaut : « Recettes ».
+- **timer_entity** : Aide « Minuteur » partagée entre toutes les recettes (ex. `timer.recette_en_cours`). Vide = pas de boutons de minuteur.
+- **step_entity** : Aide « Nombre » qui pilote l'onglet actif (ex. `input_number.recette_etape`). Vide = pas de boutons Commencer / Précédent / Suivant.
+- **entry_id** : Seulement si tu as plusieurs serveurs CookCLI. Vide = le serveur par défaut.
 
 Pour l'utiliser, créez un nouveau tableau de bord et sélectionnez la stratégie CookCLI, ou référencez-la dans votre configuration de tableau de bord.
 
@@ -94,9 +90,6 @@ Ce projet est distribué sous licence présente dans le fichier [LICENSE](./LICE
 
 ## 🔗 Liens
 
-- **Intégration** : https://git.thethomaas.net/TheThomaas/ha-cookcli
-- **Stratégie** : https://git.thethomaas.net/TheThomaas/ha-cookcli-strategy
-- **Carte** : https://git.thethomaas.net/TheThomaas/ha-cookcli-card
 - **CookCLI** : https://github.com/cooklang/CookCLI
 - **Cooklang** : https://cooklang.org/
 
