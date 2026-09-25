@@ -449,27 +449,32 @@ class CookCliRecipeViewStrategy extends HTMLElement {
       });
     }
 
-    if (config.timer_entity) {
+    if (config.timer_entity && timers.length) {
+      const buttons = [];
       for (const timer of timers) {
         const seconds = this._parseDurationSeconds(timer.duration, timer.unit);
         if (!seconds) continue;
         const label = `${timer.duration ?? ""} ${timer.unit ?? ""}`.trim();
+        buttons.push({
+          type: "button",
+          name: label,
+          icon: "mdi:timer-outline",
+          tap_action: {
+            action: "perform-action",
+            perform_action: "timer.start",
+            target: { entity_id: config.timer_entity },
+            data: { duration: this._secondsToHms(seconds) },
+          },
+        });
+      }
+
+      if (buttons.length) {
+        leftCards.push({ type: "custom:circular-timer-card", entity: config.timer_entity });
         leftCards.push({
-          type: "horizontal-stack",
-          cards: [
-            {
-              type: "button",
-              name: `Démarrer ${label}`,
-              icon: "mdi:timer-outline",
-              tap_action: {
-                action: "perform-action",
-                perform_action: "timer.start",
-                target: { entity_id: config.timer_entity },
-                data: { duration: this._secondsToHms(seconds) },
-              },
-            },
-            { type: "custom:circular-timer-card", entity: config.timer_entity },
-          ],
+          type: "grid",
+          columns: Math.min(2, buttons.length),
+          square: false,
+          cards: buttons,
         });
       }
     }
