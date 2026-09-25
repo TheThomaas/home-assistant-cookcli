@@ -16,4 +16,4 @@ HASSIO_DISCOVERY_SLUG = "cookcli"
 # donc pas besoin de poller souvent.
 UPDATE_INTERVAL_MINUTES = 15
 
-PLATFORMS: list[str] = ["todo"]
+# PLATFORMS: list[str] = ["todo"]

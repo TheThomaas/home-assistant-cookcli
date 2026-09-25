@@ -14,7 +14,8 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
 
 from .api import CookCliApiClient, CookCliApiError
-from .const import CONF_HOST, CONF_PORT, DOMAIN, PLATFORMS
+from .const import CONF_HOST, CONF_PORT, DOMAIN
+# from .const import CONF_HOST, CONF_PORT, DOMAIN, PLATFORMS
 from .coordinator import CookCliCoordinator
 from .image_proxy import CookCliImageView
 from .websocket_api import async_setup_websocket_api
@@ -67,8 +68,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             ),
         ])
 
-    if PLATFORMS:
-        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    # if PLATFORMS:
+    #     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
@@ -143,8 +144,8 @@ async def async_setup(hass: HomeAssistant, config) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Décharge une entrée de configuration CookCLI."""
     unload_ok = True
-    if PLATFORMS:
-        unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    # if PLATFORMS:
+    #     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id)

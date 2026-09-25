@@ -143,10 +143,10 @@ async def ws_get_recipe(
 
     recipe["image_url"] = _image_url(hass, entry_id, recipe.get("image"))
 
-    todo_entity = entry_data.get("todo_entity")
-    if todo_entity is not None:
-        todo_entity.set_ingredients(_ingredient_summaries(recipe.get("ingredients", [])))
-        recipe["todo_entity_id"] = todo_entity.entity_id
+    # todo_entity = entry_data.get("todo_entity")
+    # if todo_entity is not None:
+    #     todo_entity.set_ingredients(_ingredient_summaries(recipe.get("ingredients", [])))
+    #     recipe["todo_entity_id"] = todo_entity.entity_id
 
     connection.send_result(msg["id"], recipe)
 
