@@ -480,7 +480,6 @@ class CookCliRecipeViewStrategy extends HTMLElement {
     }
 
     if (!leftCards.length) {
-      // horizontal-stack veut deux cartes ; une carte vide maintient le ratio.
       leftCards.push({ type: "markdown", content: " " });
     }
 
