@@ -455,11 +455,17 @@ class CookCliRecipeViewStrategy extends HTMLElement {
         if (!seconds) continue;
         const label = `${timer.duration ?? ""} ${timer.unit ?? ""}`.trim();
         leftCards.push({
-          type: "custom:cookcli-timer-start-card",
-          entity: config.timer_entity,
-          duration: this._secondsToHms(seconds),
-          label,
+          type: "button",
+          name: `Démarrer ${label}`,
+          icon: "mdi:timer-outline",
+          tap_action: {
+            action: "perform-action",
+            perform_action: "timer.start",
+            target: { entity_id: config.timer_entity },
+            data: { duration: this._secondsToHms(seconds) },
+          },
         });
+        leftCards.push({ type: "custom:circular-timer-card", entity: config.timer_entity });
       }
     }
 
