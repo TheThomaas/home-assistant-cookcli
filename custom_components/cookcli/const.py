@@ -15,3 +15,8 @@ HASSIO_DISCOVERY_SLUG = "cookcli"
 # Les fichiers .cook ne changent qu'après un sync git côté add-on,
 # donc pas besoin de poller souvent.
 UPDATE_INTERVAL_MINUTES = 15
+
+# Clé hass.data marquant l'enregistrement (unique) des éléments globaux au
+# domaine : commandes websocket, vue du proxy d'images, chemins statiques.
+DATA_GLOBAL_SETUP_DONE = "global_setup_done"
+

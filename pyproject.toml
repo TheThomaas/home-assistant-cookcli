@@ -1,0 +1,11 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+target-version = "py313"
+
+[tool.ruff.lint]
+# Erreurs réelles uniquement (noms non définis, imports inutilisés, syntaxe).
+# Le tri d'imports et le style ne sont pas imposés pour ne pas noyer la CI.
+select = ["E4", "E7", "E9", "F"]

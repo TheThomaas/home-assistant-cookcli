@@ -84,6 +84,28 @@ Options disponibles :
 
 Pour l'utiliser, créez un nouveau tableau de bord et sélectionnez la stratégie CookCLI, ou référencez-la dans votre configuration de tableau de bord.
 
+## 🧪 Tests
+
+`pytest` couvre `api.py` : le client HTTP CookCLI et la résolution des recettes.
+Ce module ne dépend que de `aiohttp`, donc la suite tourne **sans Home Assistant
+installé** et sans épingler de version de HA.
+
+```bash
+pip install aiohttp pytest ruff
+pytest
+ruff check .
+```
+
+Couvert : aplatissement de l'arborescence `GET /api/recipes`, résolution des
+références par index dans les étapes, valeurs numériques imbriquées, traduction
+des erreurs HTTP (statut, non-JSON, timeout, erreur réseau), URLs (`/reload`,
+proxy d'images).
+
+Non couvert, faute de `pytest-homeassistant-custom-component` : le config flow,
+le coordinator, la vue de proxy d'images et l'enregistrement des routes
+statiques. Le workflow `.forgejo/workflows/tests.yml` exécute lint + tests sur
+chaque PR et sur `main`.
+
 ## 📄 Licence
 
 Ce projet est distribué sous licence présente dans le fichier [LICENSE](./LICENSE) du dépôt.

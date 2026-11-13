@@ -1,0 +1,27 @@
+name: tests
+
+"on":
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      # Home Assistant n'est volontairement pas installé : les tests couvrent
+      # api.py, qui ne dépend que d'aiohttp. Pas de version de HA à épingler.
+      - name: Installer les dépendances de test
+        run: pip install aiohttp pytest ruff
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Tests
+        run: pytest
