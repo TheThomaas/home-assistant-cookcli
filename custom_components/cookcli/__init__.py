@@ -14,8 +14,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
 
 from .api import CookCliApiClient, CookCliApiError
-from .const import CONF_HOST, CONF_PORT, DOMAIN
-# from .const import CONF_HOST, CONF_PORT, DOMAIN, PLATFORMS
+from .const import CONF_HOST, CONF_PORT, DATA_GLOBAL_SETUP_DONE, DOMAIN
 from .coordinator import CookCliCoordinator
 from .image_proxy import CookCliImageView
 from .websocket_api import async_setup_websocket_api
@@ -45,9 +44,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     }
 
     # Les commandes websocket, la vue de proxy d'images et les chemins
-    # statiques sont globaux au domaine : on ne les enregistre qu'une
-    # seule fois, même si plusieurs serveurs CookCLI sont configurés.
-    if len(hass.data[DOMAIN]) == 1:
+    # statiques sont globaux au domaine : on ne les enregistre qu'une seule
+    # fois par instance de Home Assistant. S'appuyer sur la taille de
+    # hass.data[DOMAIN] ne marchait pas : après un unload/reload d'une entrée
+    # unique, le dict repasse à 1 et l'on réenregistre tout (aiohttp refuse
+    # alors la seconde déclaration de la route statique). Le drapeau reste
+    # donc posé pour toute la vie de l'instance.
+    if not hass.data.get(DATA_GLOBAL_SETUP_DONE):
         async_setup_websocket_api(hass)
         hass.http.register_view(CookCliImageView(hass))
 
@@ -67,6 +70,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 cache_headers=False,
             ),
         ])
+        hass.data[DATA_GLOBAL_SETUP_DONE] = True
 
     # if PLATFORMS:
     #     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
